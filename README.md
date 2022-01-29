@@ -2,7 +2,7 @@
 
 <img src="./docs/figs/DI-drive.png" width="200" alt="icon"/>
 
-Updated on 2021.09.02 DI-drive-v0.1.2 (beta)
+Updated on 2021.12.3 DI-drive-v0.2.2 (beta)
 
 DI-drive - Decision Intelligence Platform for Autonomous Driving simulation.
 
@@ -24,7 +24,7 @@ and most importantly, to **put these all together!**
 
 **DI-drive** uses [DI-engine](https://github.com/opendilab/DI-engine), a Reinforcement Learning
 platform to build most of the running modules and demos. **DI-drive** currently supports [Carla](http://carla.org),
-an open-source Autonomous Drining simualtor to operate driving simualtion.
+an open-source Autonomous Drining simulator to operate driving simualtion.
 
 ## Installation
 
@@ -51,6 +51,7 @@ Please refer to [FAQ](https://opendilab.github.io/DI-drive/faq/index.html) for f
 
 - BeV Speed RL
 - [Implicit Affordance](https://arxiv.org/abs/1911.10868)
+- [Latent DRL](https://arxiv.org/abs/2001.08726)
 
 ## DI-drive Casezoo
 
