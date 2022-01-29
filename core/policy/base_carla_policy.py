@@ -34,6 +34,7 @@ class BaseCarlaPolicy(Policy):
             self._enable_field = self.total_field
         else:
             self._enable_field = enable_field
+        self._model = model
 
         for field in self._enable_field:
             getattr(self, '_init_' + field)()
@@ -70,3 +71,12 @@ class BaseCarlaPolicy(Policy):
         if isinstance(data, deque):
             data = list(data)
         return data
+
+    def _load_state_dict_learn(self, state_dict: Dict[str, Any]) -> None:
+        self._model.load_state_dict(state_dict['model'], strict=True)
+
+    def _load_state_dict_collect(self, state_dict: Dict[str, Any]) -> None:
+        self._model.load_state_dict(state_dict['model'], strict=True)
+
+    def _load_state_dict_eval(self, state_dict: Dict[str, Any]) -> None:
+        self._model.load_state_dict(state_dict['model'], strict=True)

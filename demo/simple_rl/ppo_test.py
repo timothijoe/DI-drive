@@ -1,14 +1,14 @@
 import torch
 from easydict import EasyDict
 
-from core.envs import SimpleCarlaEnv
+from core.envs import SimpleCarlaEnv, DriveEnvWrapper
 from core.utils.others.tcp_helper import parse_carla_tcp
 from core.eval import SingleCarlaEvaluator
 from ding.policy import PPOPolicy
 from ding.utils import set_pkg_seed
 from ding.utils.default_helper import deep_merge_dicts
 from demo.simple_rl.model import PPORLModel
-from demo.simple_rl.env_wrapper import DiscreteBenchmarkEnvWrapper
+from demo.simple_rl.env_wrapper import ContinuousEnvWrapper
 
 eval_config = dict(
     env=dict(
@@ -36,7 +36,7 @@ eval_config = dict(
         ignore_light=True,
         visualize=dict(type='birdview', outputs=['show']),
     ),
-    model=dict(action_shape=21,),
+    model=dict(action_shape=2,),
     policy=dict(
         cuda=True,
         ckpt_path='',
@@ -63,7 +63,7 @@ def main(cfg, seed=0):
     tcp_list = parse_carla_tcp(cfg.server)
     host, port = tcp_list[0]
 
-    carla_env = DiscreteBenchmarkEnvWrapper(SimpleCarlaEnv(cfg.env, host, port), cfg.env_wrapper)
+    carla_env = DriveEnvWrapper(ContinuousEnvWrapper(SimpleCarlaEnv(cfg.env, host, port)), cfg.env.wrapper)
     carla_env.seed(seed)
     set_pkg_seed(seed)
     model = PPORLModel(**cfg.model)
@@ -72,7 +72,7 @@ def main(cfg, seed=0):
     if cfg.policy.ckpt_path != '':
         state_dict = torch.load(cfg.policy.ckpt_path, map_location='cpu')
         policy.eval_mode.load_state_dict(state_dict)
-    evaluator = SingleCarlaEvaluator(cfg.eval, carla_env, policy.eval_mode)
+    evaluator = SingleCarlaEvaluator(cfg.policy.eval.evaluator, carla_env, policy.eval_mode)
     evaluator.eval()
     evaluator.close()
 

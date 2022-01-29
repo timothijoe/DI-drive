@@ -69,8 +69,6 @@ class Visualizer(object):
             - image: Rendered image.
             - data_dict(Dict, optional): data dict containing information, state, action and so on
         """
-        if len(self._outputs) == 0:
-            return
         if data_dict is None:
             data_dict = {}
         WHITE = (255, 255, 255)
@@ -145,7 +143,7 @@ class Visualizer(object):
             if 'tick' in data_dict:
                 text = 'Time: %d' % data_dict['tick']
                 if 'end_timeout' in data_dict:
-                    text += '/%d' % data_dict['end_timeout']
+                    text += '/%.1f' % data_dict['end_timeout']
                 _write(text, right_text_pos, 9, fontsize=fontsize)
                 right_text_pos += 1
             if 'reward' in data_dict:
@@ -185,12 +183,16 @@ class Visualizer(object):
         Save file or release file writter, destroy windows.
         """
         if self._gif_maker is not None:
-            self._gif_maker.save(self._name, self._save_dir, self._name)
+            self._gif_maker.save(self._name, self._save_dir, self._name + '.gif')
             self._gif_maker.clear(self._name)
         if self._video_maker is not None:
             self._video_maker.clear()
         if 'show' in self._outputs:
             cv2.destroyAllWindows()
+
+    @property
+    def canvas(self):
+        return self._canvas
 
     @classmethod
     def default_config(cls: type) -> EasyDict:
