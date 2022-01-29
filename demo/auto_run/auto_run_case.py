@@ -3,7 +3,7 @@ import argparse
 from argparse import RawTextHelpFormatter
 from easydict import EasyDict
 
-from core.envs import CarlaEnvWrapper, ScenarioCarlaEnv
+from core.envs import DriveEnvWrapper, ScenarioCarlaEnv
 from core.policy import AutoPIDPolicy
 from ding.utils import set_pkg_seed
 from core.simulators.srunner.tools.route_parser import RouteParser
@@ -60,7 +60,7 @@ def main(args, cfg, seed=0):
     if args.scenario is not None:
         configs += ScenarioConfigurationParser.parse_scenario_configuration(args.scenario)
 
-    carla_env = CarlaEnvWrapper(ScenarioCarlaEnv(cfg.env, args.host, args.port))
+    carla_env = DriveEnvWrapper(ScenarioCarlaEnv(cfg.env, args.host, args.port))
     carla_env.seed(seed)
     set_pkg_seed(seed)
     auto_policy = AutoPIDPolicy(cfg.policy).eval_mode
@@ -73,11 +73,11 @@ def main(args, cfg, seed=0):
             action = actions[0]['action']
             timestep = carla_env.step(action)
             obs = timestep.obs
-            carla_env.render()
             if timestep.info.get('abnormal', False):
                 # If there is an abnormal timestep, reset all the related variables(including this env).
                 auto_policy.reset([0])
                 obs = carla_env.reset(config)
+            carla_env.render()
             if timestep.done:
                 break
     carla_env.close()

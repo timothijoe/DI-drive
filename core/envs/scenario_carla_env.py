@@ -5,13 +5,13 @@ from datetime import datetime
 from typing import Any, Dict
 from gym import spaces
 
-from .base_carla_env import BaseCarlaEnv
+from .base_drive_env import BaseDriveEnv
 from core.simulators import CarlaScenarioSimulator
 from core.utils.others.visualizer import Visualizer
 from core.utils.simulator_utils.carla_utils import visualize_birdview
 
 
-class ScenarioCarlaEnv(BaseCarlaEnv):
+class ScenarioCarlaEnv(BaseDriveEnv):
     """
     Carla Scenario Environment with a single hero vehicle. It uses ``CarlaScenarioSimulator`` to load scenario
     configurations and interacts with Carla server to get running status. The Env is initialized with a scenario
@@ -38,8 +38,11 @@ class ScenarioCarlaEnv(BaseCarlaEnv):
     observation_space = spaces.Dict({})
     config = dict(
         simulator=dict(),
-        finish_reward=100,
+        # reward value if success
+        success_reward=10,
+        # whether open visualize
         visualize=None,
+        # outputs of scenario conclusion
         outputs=[],
         output_dir='',
     )
@@ -71,7 +74,7 @@ class ScenarioCarlaEnv(BaseCarlaEnv):
         self._output_dir = self._cfg.output_dir
         self._outputs = self._cfg.outputs
 
-        self._finish_reward = self._cfg.finish_reward
+        self._success_reward = self._cfg.success_reward
         self._is_success = False
         self._is_failure = False
         self._collided = False
@@ -266,9 +269,14 @@ class ScenarioCarlaEnv(BaseCarlaEnv):
                 'location': np.float32(state['location']),
                 'forward_vector': np.float32(state['forward_vector']),
                 'acceleration': np.float32(state['acceleration']),
+                'velocity': np.float32(state['velocity']),
+                'angular_velocity': np.float32(state['angular_velocity']),
+                'rotation': np.float32(state['rotation']),
                 'is_junction': np.float32(state['is_junction']),
                 'tl_state': state['tl_state'],
                 'tl_dis': np.float32(state['tl_dis']),
+                'waypoint_list': navigation['waypoint_list'],
+                'direction_list': navigation['direction_list'],
             }
         )
 
@@ -291,10 +299,10 @@ class ScenarioCarlaEnv(BaseCarlaEnv):
         """
         goal_reward = 0
         if self._is_success:
-            goal_reward += self._finish_reward
+            goal_reward += self._success_reward
 
         elif self._is_failure:
-            goal_reward -= self._finish_reward
+            goal_reward -= self._success_reward
 
         criteria_dict = self._simulator.get_criteria()
 
@@ -336,7 +344,7 @@ class ScenarioCarlaEnv(BaseCarlaEnv):
             'tick': self._tick,
             'end_timeout': self._simulator.end_timeout,
             'end_distance': self._simulator.end_distance,
-            'total_distance': self._simulator.total_diatance,
+            'total_distance': self._simulator.total_distance,
         }
         render_info.update(self._simulator_databuffer['state'])
         render_info.update(self._simulator_databuffer['navigation'])
