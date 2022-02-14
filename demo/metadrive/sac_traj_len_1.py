@@ -7,46 +7,69 @@ from tensorboardX import SummaryWriter
 from ding.envs import BaseEnvManager, SyncSubprocessEnvManager
 from ding.config import compile_config
 from ding.policy import PPOPolicy, DDPGPolicy
-from ding.policy.ad_sac import ADSAC
-from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner
+#from ding.policy.ad_sac import ADSAC
+from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, AdvancedReplayBuffer
 from core.envs import DriveEnvWrapper, MetaDriveMacroEnv
 from core.envs.md_hrl_env import MetaDriveHRLEnv
+from core.policy.ad_policy.traj_sac import TrajSAC
+
+import os
+
+z_freeze_decoder = False
+z_traj_seq_len = 1
+z_vae_h_dim = 64
+z_vae_latent_dim = 100
+z_dt = 0.1
+pwd = os.getcwd()
+ckpt_path = 'ckpt_files/vae_decoder_ckpt'
+ckpt_path = os.path.join(pwd, ckpt_path)
+print(ckpt_path)
 
 metadrive_rush_config = dict(
     exp_name = 'metadrive_macro_ppo3',
     env=dict(
         metadrive=dict(
-            use_render=True,
+            use_render=False,
+            show_seq_traj = False,
+            seq_traj_len = z_traj_seq_len,
+            physics_world_step_size = z_dt,
+            
         ),
         manager=dict(
             shared_memory=False,
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=3,
+        n_evaluator_episode=12,
         stop_value=99999,
-        collector_env_num=1,
-        evaluator_env_num=1,
+        collector_env_num=10,
+        evaluator_env_num=4,
         wrapper=dict(),
     ),
     policy=dict(
-        cuda=False,
+        cuda=False,         
+        freeze_decoder = z_freeze_decoder,
         continuous=False,
         model=dict(
             obs_shape=[5, 200, 200],
             action_shape=100,
-            action_space='regression',
+            action_space='reparameterization',
             actor_head_hidden_size = 64,
-            #continuous=True,
-            #encoder_hidden_size_list=[128, 128, 64],
+            freeze_decoder = z_freeze_decoder,
+            vae_seq_len = z_traj_seq_len,
+            vae_latent_dim = z_vae_latent_dim,
+            vae_h_dim = z_vae_h_dim,
+            vae_dt = z_dt,
+            vae_load_dir = None, #ckpt_path
         ),
         learn=dict(
-            epoch_per_collect=10,
+            update_per_collect=100,
+            #epoch_per_collect=10,
             batch_size=64,
             learning_rate=3e-4,
         ),
         collect=dict(
-            n_sample=100,
+            n_sample=1000,
         ),
         eval=dict(evaluator=dict(eval_freq=50, )),
         other=dict(
@@ -57,7 +80,17 @@ metadrive_rush_config = dict(
                 decay=10000,
             ),
             replay_buffer=dict(
-                replay_buffer_size=1000,),
+                replay_buffer_size=10000,
+                deepcopy = False,
+                max_use = float("inf"),
+                max_staleness = float("inf"),
+                alpha = 0.6,
+                beta = 0.4, 
+                anneal_step = 100000,
+                thruput_controller = {'push_sample_rate_limit': {'max': float("inf"), 'min': 0}, 'window_seconds': 30, 'sample_min_limit_ratio': 1},
+                monitor={'sampled_data_attr': {'average_range': 5, 'print_freq': 200}, 'periodic_thruput': {'seconds': 60}},
+                enable_track_used_data=False,
+                ),
         ), 
     ),
 )
@@ -73,7 +106,7 @@ def main(cfg):
     cfg = compile_config(
         cfg,
         SyncSubprocessEnvManager,
-        ADSAC,
+        TrajSAC,
         BaseLearner,
         SampleSerialCollector,
         InteractionSerialEvaluator
@@ -90,27 +123,38 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    policy = ADSAC(cfg.policy)
+    policy = TrajSAC(cfg.policy)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
     collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
     evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
-
+    replay_buffer = AdvancedReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
+    eps_cfg = cfg.policy.other.eps
+    from ding.rl_utils import get_epsilon_greedy_fn
+    epsilon_greedy = get_epsilon_greedy_fn(eps_cfg.start, eps_cfg.end, eps_cfg.decay, eps_cfg.type)
     learner.call_hook('before_run')
     zt = 0
 
     while True:
         zt += 1
-        # if evaluator.should_eval(learner.train_iter):
-        #     stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, 1)
-        #     if stop:
-        #         break
-        #     if zt >=100:
-        #         break
+        print('total {} times'.format(zt))
+        if evaluator.should_eval(learner.train_iter):
+            stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
+            if stop:
+                break
+            if zt >=10000:
+                break
         # Sampling data from environments
+        eps = epsilon_greedy(collector.envstep)
+        #new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter,policy_kwargs={'eps': eps})
         new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
-        learner.train(new_data, collector.envstep)
+        replay_buffer.push(new_data, cur_collector_envstep=collector.envstep)
+        for i in range(cfg.policy.learn.update_per_collect):
+            train_data = replay_buffer.sample(learner.policy.get_attribute('batch_size'), learner.train_iter)
+            if train_data is None:
+                break
+            learner.train(train_data, collector.envstep)
     learner.call_hook('after_run')
 
     collector.close()

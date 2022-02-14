@@ -17,24 +17,29 @@ class HRLNodeNavigation(NodeNetworkNavigation):
         show_navi_mark: bool = False,
         random_navi_mark_color=False,
         show_dest_mark=False,
-        show_line_to_dest=False):
+        show_line_to_dest=False,
+        seq_traj_len = 30,
+        show_seq_traj = False,
+        ):
         super(NodeNetworkNavigation, self).__init__(engine, show_navi_mark, random_navi_mark_color, show_dest_mark, show_line_to_dest)
-        self._show_traj = False
+        self._show_traj = show_seq_traj
+        self.seq_traj_len = seq_traj_len 
         if self._show_traj:
             self._init_trajs()
+
         #self.drawd = False
         
         self.LINE_TO_DEST_HEIGHT += 4
 
     def _init_trajs(self):
-        for i in range(30):
+        for i in range(self.seq_traj_len):
             init_line = LineSegs()
             init_line.setColor(self.navi_mark_color[0], self.navi_mark_color[1], self.navi_mark_color[2], 0.7)
             self.__dict__['traj_{}'.format(i)] = NodePath(init_line.create())
             self.__dict__['traj_{}'.format(i)].reparentTo(self.origin)
 
     def _draw_trajectories(self, wp_list):
-        for i in range(30):
+        for i in range(self.seq_traj_len):
             lines = LineSegs()
             lines.setColor(self.navi_mark_color[0], self.navi_mark_color[1], self.navi_mark_color[2], 0.7)
             #lines.moveTo(panda_position(wp_list[i][0], self.LINE_TO_DEST_HEIGHT+4))
@@ -69,7 +74,7 @@ class HRLNodeNavigation(NodeNetworkNavigation):
     #     self._draw_trajectories(wp_list)
 
     def draw_car_path(self, wp_list):
-        for i in range(30):
+        for i in range(self.seq_traj_len):
             lines = LineSegs()
             lines.setColor(self.navi_mark_color[0], self.navi_mark_color[1], self.navi_mark_color[2], 0.7)
             #lines.moveTo(panda_position(wp_list[i][0], self.LINE_TO_DEST_HEIGHT+4))

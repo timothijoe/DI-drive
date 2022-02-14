@@ -7,15 +7,31 @@ from tensorboardX import SummaryWriter
 from ding.envs import BaseEnvManager, SyncSubprocessEnvManager
 from ding.config import compile_config
 from ding.policy import PPOPolicy, DDPGPolicy
+#from ding.policy.ad_sac import ADSAC
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner
 from core.envs import DriveEnvWrapper, MetaDriveMacroEnv
 from core.envs.md_hrl_env import MetaDriveHRLEnv
+from core.policy.ad_policy.traj_sac import TrajSAC
+import os
+
+z_freeze_decoder = True
+z_traj_seq_len = 30
+z_vae_h_dim = 64
+z_vae_latent_dim = 100
+z_dt = 0.03
+pwd = os.getcwd()
+ckpt_path = 'ckpt_files/vae_decoder_ckpt'
+ckpt_path = os.path.join(pwd, ckpt_path)
+print(ckpt_path)
 
 metadrive_rush_config = dict(
     exp_name = 'metadrive_macro_ppo3',
     env=dict(
         metadrive=dict(
             use_render=True,
+            seq_traj_len = z_traj_seq_len,
+            physics_world_step_size = z_dt,
+            show_seq_traj = True,
         ),
         manager=dict(
             shared_memory=False,
@@ -29,14 +45,20 @@ metadrive_rush_config = dict(
         wrapper=dict(),
     ),
     policy=dict(
-        cuda=False,
+        cuda=False,         
+        freeze_decoder = z_freeze_decoder,
         continuous=False,
         model=dict(
             obs_shape=[5, 200, 200],
-            action_shape=62,
-            action_space='regression',
-            #continuous=True,
-            encoder_hidden_size_list=[128, 128, 64],
+            action_shape=100,
+            action_space='reparameterization',
+            actor_head_hidden_size = 64,
+            freeze_decoder = z_freeze_decoder,
+            vae_seq_len = z_traj_seq_len,
+            vae_latent_dim = z_vae_latent_dim,
+            vae_h_dim = z_vae_h_dim,
+            vae_dt = z_dt,
+            vae_load_dir = ckpt_path # '/home/SENSETIME/zhoutong/hoffnung/xad/result/vae_decoder_ckpt',
         ),
         learn=dict(
             epoch_per_collect=10,
@@ -71,7 +93,7 @@ def main(cfg):
     cfg = compile_config(
         cfg,
         BaseEnvManager,
-        DDPGPolicy,
+        TrajSAC,
         BaseLearner,
         SampleSerialCollector,
         InteractionSerialEvaluator
@@ -88,7 +110,7 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    policy = DDPGPolicy(cfg.policy)
+    policy = TrajSAC(cfg.policy)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
@@ -100,6 +122,9 @@ def main(cfg):
 
     while True:
         zt += 1
+        if(zt % 100 == 0):
+            print(zt)
+        #print(zt)
         # if evaluator.should_eval(learner.train_iter):
         #     stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, 1)
         #     if stop:

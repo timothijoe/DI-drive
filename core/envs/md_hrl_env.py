@@ -83,9 +83,10 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     out_of_road_penalty=5.0,
     crash_vehicle_penalty=1.0,
     crash_object_penalty=5.0,
+    run_out_of_time_penalty = 5.0,
     driving_reward=1.0,
-    speed_reward=0.1,
-    use_lateral=False,
+    speed_reward=0.5,
+    use_lateral=True,
 
     # ===== Cost Scheme =====
     crash_vehicle_cost=1.0,
@@ -95,6 +96,13 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Termination Scheme =====
     out_of_route_done=True,
     physics_world_step_size=3e-2,
+
+    # ===== Trajectory length =====
+    seq_traj_len = 30,
+    show_seq_traj = False,
+    episode_max_step = 500,
+
+
 )
 
 
@@ -143,6 +151,8 @@ class MetaDriveHRLEnv(BaseEnv):
         self.env_num = self.config["environment_num"]
 
         self.time = 0
+        self.step_num = 0
+        self.episode_rwd = 0
 
     # define a action type, and execution style
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
@@ -159,6 +169,9 @@ class MetaDriveHRLEnv(BaseEnv):
         macro_actions = self._preprocess_macro_waypoints(actions)
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
+        self.step_num = self.step_num + 1
+        self.episode_rwd = self.episode_rwd + r 
+        #print('step number is: {}'.format(self.step_num))
         #o = o.transpose((2,0,1))
         return o, r, d, i
 
@@ -247,6 +260,10 @@ class MetaDriveHRLEnv(BaseEnv):
             done = True
             done_info[TerminationState.CRASH_BUILDING] = True
             logging.info("Episode ended! Reason: crash building ")
+        if self.step_num >= self.config["episode_max_step"]:
+            done = True
+            done_info[TerminationState.CRASH_BUILDING] = True
+            logging.info("Episode ended! Reason: crash building ")
 
         # for compatibility
         # crash almost equals to crashing with vehicles
@@ -254,6 +271,7 @@ class MetaDriveHRLEnv(BaseEnv):
             done_info[TerminationState.CRASH_VEHICLE] or done_info[TerminationState.CRASH_OBJECT]
             or done_info[TerminationState.CRASH_BUILDING]
         )
+
         return done, done_info
 
     def cost_function(self, vehicle_id: str):
@@ -266,6 +284,8 @@ class MetaDriveHRLEnv(BaseEnv):
             step_info["cost"] = self.config["crash_vehicle_cost"]
         elif vehicle.crash_object:
             step_info["cost"] = self.config["crash_object_cost"]
+        elif self.step_num > self.config["episode_max_step"]:
+            step_info['cost'] = 1
         return step_info['cost'], step_info
 
     def _is_out_of_road(self, vehicle):
@@ -297,20 +317,26 @@ class MetaDriveHRLEnv(BaseEnv):
         long_last, _ = current_lane.local_coordinates(vehicle.last_macro_position)
         long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
 
+        vehicle_heading_theta = vehicle.heading_theta
+        road_heading_theta = current_lane.heading
+        theta_error = self.wrap_angle(vehicle_heading_theta - road_heading_theta)
+
         # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
         if self.config["use_lateral"]:
-            lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            lateral_factor = clip(1 - 0.5 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
         else:
             lateral_factor = 1.0
+        longitude_factor = 0.2
+        heading_factor = 0.5
+        
+        #heading_theta_rwd = 5 - 2 * np.abs(theta_error) 
 
         reward = 0.0
-        lateral_factor *= 0.2 #0.02
-        reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
-        reward += self.config["speed_reward"] * (vehicle.speed / vehicle.max_speed) * positive_road
-        #print('vel speed: {}'.format(vehicle.speed))
-        speed_rwd = 0 #-0.3 if vehicle.speed < 60 else 0
-        reward += speed_rwd
-
+        max_spd = 10
+        reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor *  longitude_factor * positive_road 
+        reward += self.config["speed_reward"] * (vehicle.last_spd / max_spd) * positive_road
+        reward += max(heading_factor * ( 1 - np.abs(theta_error)), 0)
         step_info["step_reward"] = reward
 
         if vehicle.arrive_destination:
@@ -325,6 +351,8 @@ class MetaDriveHRLEnv(BaseEnv):
             reward = -self.config["crash_vehicle_penalty"]
         elif vehicle.crash_object:
             reward = -self.config["crash_object_penalty"]
+        elif self.step_num >= self.config["episode_max_step"]:
+            reward = - self.config["run_out_of_time_penalty"]
         return reward, step_info
 
     def switch_to_third_person_view(self) -> None:
@@ -360,11 +388,17 @@ class MetaDriveHRLEnv(BaseEnv):
         rewards = {}
         for v_id, v in self.vehicles.items():
             o = self.observations[v_id].observe(v)
-            o[0,0,1] = 0
-            o[0,1,1] = 0
-            o[0,2,1] = 0
-            o[0,3,1] = v.last_spd
-            obses[v_id] = o
+            # o[0,0,1] = 0
+            # o[0,1,1] = 0
+            # o[0,2,1] = 0
+            # o[0,3,1] = v.last_spd
+            # append the six-th 
+            #v_o = np.ones([200, 200, 1]) * v.last_spd * 0.01
+            #o = np.concatenate((o, v_o), axis = 2)
+            o_dict = {}
+            o_dict['birdview'] = o 
+            o_dict['speed'] = v.last_spd
+            obses[v_id] =  o_dict #o
             done_function_result, done_infos[v_id] = self.done_function(v_id)
             rewards[v_id], reward_infos[v_id] = self.reward_function(v_id)
             _, cost_infos[v_id] = self.cost_function(v_id)
@@ -446,10 +480,13 @@ class MetaDriveHRLEnv(BaseEnv):
         return actions
 
     def _step_macro_simulator(self, actions):
-        simulation_frequency = 30  # 60 80
+        #simulation_frequency = 30  # 60 80
+        simulation_frequency = self.config['seq_traj_len']
         policy_frequency = 1
         frames = int(simulation_frequency / policy_frequency)
         self.time = 0
+        # print('seq len is: ')
+        # print(self.config['seq_traj_len'])
         #print('di action pairs: {}'.format(actions))
         #actions = {vid: self.action_type.actions[vvalue] for vid, vvalue in actions.items()}
         # wp_list = self.get_waypoint_list()
@@ -467,23 +504,33 @@ class MetaDriveHRLEnv(BaseEnv):
             scene_manager_after_step_infos, scene_manager_before_step_infos, allow_new_keys=True, without_copy=True
         )
 
-    @property
-    def action_space(self) -> gym.Space:
-        """
-        Return observation spaces of active and controllable vehicles
-        :return: Dict
-        """
-        #return self.action_type.space()
-        return gym.spaces.Box(-50.0, 50.0, shape=(62, ), dtype=np.float32)
+    # @property
+    # def action_space(self) -> gym.Space:
+    #     """
+    #     Return observation spaces of active and controllable vehicles
+    #     :return: Dict
+    #     """
+    #     #return self.action_type.space()
+    #     return gym.spaces.Box(-50.0, 50.0, shape=(62, ), dtype=np.float32)
 
     def _get_reset_return(self):
         ret = {}
         self.engine.after_step()
         o = None
+        print('episode reward: {}'.format(self.episode_rwd))
+        self.episode_rwd = 0
+        self.step_num = 0
         for v_id, v in self.vehicles.items():
             self.observations[v_id].reset(self, v)
             ret[v_id] = self.observations[v_id].observe(v)
             o = self.observations[v_id].observe(v)
+            v_o = np.ones([200, 200, 1]) * v.last_spd * 0.01
+            #o = np.concatenate((o, v_o), axis = 2)
+            o_dict = {}
+            o_dict['birdview'] = o 
+            o_dict['speed'] = v.last_spd
+            #obses[v_id] =  o_dict #o
+
             if hasattr(v, 'macro_succ'):
                 v.macro_succ = False
             if hasattr(v, 'macro_crash'):
@@ -498,7 +545,7 @@ class MetaDriveHRLEnv(BaseEnv):
         #         print('target velocity: {}'.format(target_speed))
         #         v.set_velocity(v.heading, target_speed)
         if self.remove_init_stop:
-            return o
+            return o_dict
         for i in range(8):
             o, r, d, info = self.step(self.action_type.actions_indexes["Holdon"])
         for v_id ,v in self.vehicles.items():
@@ -539,6 +586,14 @@ class MetaDriveHRLEnv(BaseEnv):
         )
         #o = TopDownMultiChannel(vehicle_config, self, False)
         return o
+    
+    def wrap_angle(self, angle_in_rad):
+        #angle_in_rad = angle_in_degree / 180.0 * np.pi
+        while (angle_in_rad > np.pi):
+            angle_in_rad -= 2 * np.pi
+        while (angle_in_rad <= -np.pi):
+            angle_in_rad += 2 * np.pi
+        return angle_in_rad
 
 
 register(

@@ -11,17 +11,17 @@ from ding.rl_utils import v_1step_td_data, v_1step_td_error, get_train_sample, q
 from ding.model import model_wrap
 from ding.utils import POLICY_REGISTRY
 from ding.utils.data import default_collate, default_decollate
+from ding.policy.sac import SACPolicy
 from ding.policy import Policy
 from ding.policy.common_utils import default_preprocess_learn
-#from ding.model.template.ad_vae import VAELSTM
-from ding.policy.sac import SACPolicy
 from ding.model import create_model
 from ding.utils import import_module, allreduce, broadcast, get_rank, allreduce_async, synchronize, POLICY_REGISTRY
-from core.policy.ad_policy.lstm_vae import LSTMVAE
 
-@POLICY_REGISTRY.register('hrl_sac')
-class HRLSAC(SACPolicy):
 
+
+
+@POLICY_REGISTRY.register('traj_sac')
+class TrajSAC(SACPolicy):
     def __init__(
             self,
             cfg: dict,
@@ -30,17 +30,7 @@ class HRLSAC(SACPolicy):
     ) -> None:
         self._cfg = cfg
         self._on_policy = self._cfg.on_policy
-        self._traj_seq_len = self._cfg.traj_seq_len
-        #self._freeze_vae = self._cfg.freeze_vae
-        self._train_decoder = self._cfg.train_decoder
-        self._vae_h_dim = self._cfg.vae_h_dim
-        self._vae_latent_dim = self._cfg.vae_latent_dim
-        if not self._train_decoder:
-            self._need_load = True
-        else:
-            self._need_load = False
-
-        #print('zt = {}'.format(self._traj_seq_len))
+        self._freeze_decoder = self._cfg.freeze_decoder    
         if enable_field is None:
             self._enable_field = self.total_field
         else:
@@ -74,61 +64,64 @@ class HRLSAC(SACPolicy):
 
         for field in self._enable_field:
             getattr(self, '_init_' + field)()
-    def _init_learn(self):
+
+    def ad_default_model(self) -> Tuple[str, List[str]]:
+        import core.policy.ad_policy.traj_qac
+        return 'traj_qac', ['core.policy.ad_policy.traj_qac']
+
+    def _create_model_ad(self, cfg: dict, model= None) -> torch.nn.Module:
+        if model is None:
+            model_cfg = cfg.model
+            if 'type' not in model_cfg:
+                m_type, import_names = self.ad_default_model()
+                model_cfg.type = m_type
+                model_cfg.import_names = import_names
+            return create_model(model_cfg)
+        else:
+            if isinstance(model, torch.nn.Module):
+                return model
+            else:
+                raise RuntimeError("invalid model: {}".format(type(model)))
+
+
+    def _init_learn(self) -> None:
         r"""
         Overview:
             Learn mode init method. Called by ``self.__init__``.
             Init q, value and policy's optimizers, algorithm config, main and target models.
         """
         # Init
-        self._freeze_vae = True
         self._priority = self._cfg.priority
         self._priority_IS_weight = self._cfg.priority_IS_weight
         self._value_network = False  # TODO self._cfg.model.value_network
-        self._twin_critic = self._cfg.model.twin_critic
+        self._twin_critic = False
 
         # Weight Init for the last output layer
         # init_w = self._cfg.learn.init_w
-        # self._model.actor[2].mu.weight.data.uniform_(-init_w, init_w)
-        # self._model.actor[2].mu.bias.data.uniform_(-init_w, init_w)
-        # self._model.actor[2].log_sigma_layer.weight.data.uniform_(-init_w, init_w)
-        # self._model.actor[2].log_sigma_layer.bias.data.uniform_(-init_w, init_w)
+        # self._model.actor[1].mu.weight.data.uniform_(-init_w, init_w)
+        # self._model.actor[1].mu.bias.data.uniform_(-init_w, init_w)
+        # self._model.actor[1].log_sigma_layer.weight.data.uniform_(-init_w, init_w)
+        # self._model.actor[1].log_sigma_layer.bias.data.uniform_(-init_w, init_w)
 
         # Optimizers
-
-        self._vae_model = LSTMVAE(
-            seq_len = self._traj_seq_len,
-            h_dim = self._vae_h_dim,
-            latent_dim = self._vae_latent_dim
-        )
-        #self._vae_model 
         if self._value_network:
             self._optimizer_value = Adam(
                 self._model.value_critic.parameters(),
                 lr=self._cfg.learn.learning_rate_value,
             )
-        if self._need_load:
-            model_PATH = '/home/SENSETIME/zhoutong/hoffnung/motion_primitive_vae/result/christmas105/ckpt/47_ckpt'
-            self._vae_model.load_state_dict(torch.load(model_PATH))
+        self._optimizer_q = Adam(
+            self._model.critic.parameters(),
+            lr=self._cfg.learn.learning_rate_q,
+        )
 
-        
+        if self._freeze_decoder:
             self._optimizer_policy = Adam(
                 self._model.actor.parameters(),
                 lr=self._cfg.learn.learning_rate_policy,
-            )        
-            self._optimizer_q = Adam(
-                self._model.critic.parameters(),
-                lr=self._cfg.learn.learning_rate_q,
             )
-
-        # if freeze vae, then we output latent_dim shape action
-        # if not , we output traj_len * 2 shape action
-        # how we define this?
-        # self._optimizer_policy = Adam(
-        #     self._model.actor.parameters(),
-        #     lr=self._cfg.learn.learning_rate_policy,
-        # )
-
+        else:
+            self._optimizer_policy = Adam([{"params":self._model.actor.parameters()},{"params":self._model._traj_decoder.parameters()}],
+            lr=self._cfg.learn.learning_rate_policy)
         # Algorithm config
         self._gamma = self._cfg.learn.discount_factor
         # Init auto alpha
@@ -166,32 +159,7 @@ class HRLSAC(SACPolicy):
         self._target_model.reset()
 
         self._forward_learn_cnt = 0
-        self._twin_critic = False
-        
 
-        #self._optimizer_vae = Adam(self._vae_model.parameters(), lr = self._cfg.learn.learning_rate_value)
-    def ad_default_model(self) -> Tuple[str, List[str]]:
-        #return 'ad_qac', ['ding.model.template.ad_qac']
-        import core.policy
-        return 'conv_qac', ['core.policy.ad_policy.conv_qac']
-        # if self._cfg.multi_agent:
-        #     return 'maqac_continuous', ['ding.model.template.maqac']
-        # else:
-        #     return 'qac', ['ding.model.template.qac']
-
-    def _create_model_ad(self, cfg: dict, model= None) -> torch.nn.Module:
-        if model is None:
-            model_cfg = cfg.model
-            if 'type' not in model_cfg:
-                m_type, import_names = self.ad_default_model()
-                model_cfg.type = m_type
-                model_cfg.import_names = import_names
-            return create_model(model_cfg)
-        else:
-            if isinstance(model, torch.nn.Module):
-                return model
-            else:
-                raise RuntimeError("invalid model: {}".format(type(model)))
     def _forward_learn(self, data: dict) -> Dict[str, Any]:
         """
         Overview:
@@ -241,8 +209,13 @@ class HRLSAC(SACPolicy):
                 # keep dimension for loss computation (usually for action space is 1 env. e.g. pendulum)
                 next_log_prob = dist.log_prob(pred).unsqueeze(-1)
                 next_log_prob = next_log_prob - torch.log(y).sum(-1, keepdim=True)
+                batch_size = next_obs['speed'].shape[0]
+                next_state_init = torch.zeros(batch_size, 4)
+                next_state_init = to_device(next_state_init, self._device)
+                next_state_init[:, 3] = next_obs['speed']
+                traj = self._target_model.generate_traj_from_lat(next_action, next_state_init)
 
-                next_data = {'obs': next_obs, 'latent_action': next_action}
+                next_data = {'obs': next_obs, 'latent_action': next_action, 'trajectory': traj}
                 target_q_value = self._target_model.forward(next_data, mode='compute_critic')['q_value']
                 # the value of a policy according to the maximum entropy objective
                 if self._twin_critic:
@@ -280,7 +253,13 @@ class HRLSAC(SACPolicy):
         log_prob = dist.log_prob(pred).unsqueeze(-1)
         log_prob = log_prob - torch.log(y).sum(-1, keepdim=True)
 
-        eval_data = {'obs': obs, 'latent_action': action}
+        batch_size = obs['speed'].shape[0]
+        learn_state_init = torch.zeros(batch_size, 4)
+        learn_state_init = to_device(learn_state_init, self._device)
+        learn_state_init[:, 3] = obs['speed']
+
+        traj = self._learn_model.generate_traj_from_lat(action, learn_state_init)
+        eval_data = {'obs': obs, 'latent_action': action, 'trajectory': traj}
         new_q_value = self._learn_model.forward(eval_data, mode='compute_critic')['q_value']
         if self._twin_critic:
             new_q_value = torch.min(new_q_value[0], new_q_value[1])
@@ -343,6 +322,40 @@ class HRLSAC(SACPolicy):
             **loss_dict
         }
 
+    def _state_dict_learn(self) -> Dict[str, Any]:
+        ret = {
+            'model': self._learn_model.state_dict(),
+            'target_model': self._target_model.state_dict(),
+            'optimizer_q': self._optimizer_q.state_dict(),
+            'optimizer_policy': self._optimizer_policy.state_dict(),
+        }
+        if self._value_network:
+            ret.update({'optimizer_value': self._optimizer_value.state_dict()})
+        if self._auto_alpha:
+            ret.update({'optimizer_alpha': self._alpha_optim.state_dict()})
+        return ret
+
+    def _load_state_dict_learn(self, state_dict: Dict[str, Any]) -> None:
+        self._learn_model.load_state_dict(state_dict['model'])
+        self._target_model.load_state_dict(state_dict['target_model'])
+        self._optimizer_q.load_state_dict(state_dict['optimizer_q'])
+        if self._value_network:
+            self._optimizer_value.load_state_dict(state_dict['optimizer_value'])
+        self._optimizer_policy.load_state_dict(state_dict['optimizer_policy'])
+        if self._auto_alpha:
+            self._alpha_optim.load_state_dict(state_dict['optimizer_alpha'])
+
+    def _init_collect(self) -> None:
+        r"""
+        Overview:
+            Collect mode init method. Called by ``self.__init__``.
+            Init traj and unroll length, collect model.
+            Use action noise for exploration.
+        """
+        self._unroll_len = self._cfg.collect.unroll_len
+        self._collect_model = model_wrap(self._model, wrapper_name='base')
+        self._collect_model.reset()
+
     def _forward_collect(self, data: dict) -> dict:
         r"""
         Overview:
@@ -360,21 +373,47 @@ class HRLSAC(SACPolicy):
         data = default_collate(list(data.values()))
         if self._cuda:
             data = to_device(data, self._device)
-        init_state_batch = data[:, 1, 0, 0: 4]
+        batch_size = data['speed'].shape[0]
+        init_state_batch = torch.zeros(batch_size, 4)
+        init_state_batch = to_device(init_state_batch, self._device)
+        init_state_batch[:, 3] = data['speed']
         self._collect_model.eval()
         with torch.no_grad():
             (mu, sigma) = self._collect_model.forward(data, mode='compute_actor')['logit']
             dist = Independent(Normal(mu, sigma), 1)
             action = torch.tanh(dist.rsample())
-            output = {'logit': (mu, sigma), 'action': action}
-            output['latent_action'] = output['action']
-            traj = self._vae_model.decode(output['action'], init_state_batch)
-            traj = torch.cat([init_state_batch.unsqueeze(1), traj], dim = 1)
-            output['action'] = traj[:, :,:2]
+            output = {'logit': (mu, sigma), 'latent_action': action}
+            traj = self._collect_model.generate_traj_from_lat(output['latent_action'], init_state_batch)
+            output['trajectory'] = traj
+            # no matter we freeze decoder or not, we send trajectory to env.
+            output['action'] = traj
         if self._cuda:
             output = to_device(output, 'cpu')
         output = default_decollate(output)
         return {i: d for i, d in zip(data_id, output)}
+
+    def _process_transition(self, obs: Any, model_output: dict, timestep: namedtuple) -> Dict[str, Any]:
+        transition = {
+            'obs' : obs,
+            'next_obs': timestep.obs,
+            'latent_action': model_output['latent_action'],
+            'trajectory': model_output['trajectory'],
+            'reward': timestep.reward,
+            'done': timestep.done,
+        }
+        return transition
+
+    def _get_train_sample(self, data: list) -> Union[None, List[Any]]:
+        return get_train_sample(data, self._unroll_len)
+
+    def _init_eval(self) -> None:
+        r"""
+        Overview:
+            Evaluate mode init method. Called by ``self.__init__``.
+            Init eval model. Unlike learn and collect model, eval model does not need noise.
+        """
+        self._eval_model = model_wrap(self._model, wrapper_name='base')
+        self._eval_model.reset()
 
     def _forward_eval(self, data: dict) -> dict:
         r"""
@@ -393,43 +432,48 @@ class HRLSAC(SACPolicy):
         data = default_collate(list(data.values()))
         if self._cuda:
             data = to_device(data, self._device)
-        init_state_batch = data[:, 1, 0, 0: 4]
+        batch_size = data['speed'].shape[0]
+        init_state_batch = torch.zeros(batch_size, 4)
+        init_state_batch = to_device(init_state_batch, self._device)
+        init_state_batch[:, 3] = data['speed']
         self._eval_model.eval()
         with torch.no_grad():
             (mu, sigma) = self._eval_model.forward(data, mode='compute_actor')['logit']
-            dist = Independent(Normal(mu, sigma), 1)
-            action = torch.tanh(dist.rsample())
-            output = {'logit': (mu, sigma), 'action': action}
+            action = torch.tanh(mu)  # deterministic_eval
+            output = {'action': action}
             output['latent_action'] = output['action']
-            traj = self._vae_model.decode(output['action'], init_state_batch)
-            traj = torch.cat([init_state_batch.unsqueeze(1), traj], dim = 1)
-            output['action'] = traj[:, :,:2]
-            # action = torch.tanh(mu)  # deterministic_eval
-            # output = {'latent_action': action}
-            # output['action'] = self._vae_model.decode(output['latent_action'], init_state_batch)
+            traj = self._eval_model.generate_traj_from_lat(output['latent_action'], init_state_batch)
+            output['trajectory'] = traj
+            # no matter we freeze decoder or not, we send trajectory to env.
+            output['action'] = traj
         if self._cuda:
             output = to_device(output, 'cpu')
         output = default_decollate(output)
         return {i: d for i, d in zip(data_id, output)}
 
-    def _process_transition(self, obs: Any, model_output: dict, timestep: namedtuple) -> Dict[str, Any]:
+    def default_model(self) -> Tuple[str, List[str]]:
+        if self._cfg.multi_agent:
+            return 'maqac_continuous', ['ding.model.template.maqac']
+        else:
+            return 'qac', ['ding.model.template.qac']
+
+    def _monitor_vars_learn(self) -> List[str]:
         r"""
         Overview:
-            Generate dict type transition data from inputs.
-        Arguments:
-            - obs (:obj:`Any`): Env observation
-            - model_output (:obj:`dict`): Output of collect model, including at least ['action']
-            - timestep (:obj:`namedtuple`): Output after env step, including at least ['obs', 'reward', 'done'] \
-                (here 'obs' indicates obs after env step, i.e. next_obs).
-        Return:
-            - transition (:obj:`Dict[str, Any]`): Dict type transition data.
+            Return variables' name if variables are to used in monitor.
+        Returns:
+            - vars (:obj:`List[str]`): Variables' name list.
         """
-
-        transition = {
-            'obs' : obs,
-            'next_obs': timestep.obs,
-            'latent_action': model_output['latent_action'],
-            'reward': timestep.reward,
-            'done': timestep.done,
-        }
-        return transition
+        twin_critic = ['twin_critic_loss'] if self._twin_critic else []
+        alpha_loss = ['alpha_loss'] if self._auto_alpha else []
+        value_loss = ['value_loss'] if self._value_network else []
+        return [
+            'alpha_loss',
+            'policy_loss',
+            'critic_loss',
+            'cur_lr_q',
+            'cur_lr_p',
+            'target_q_value',
+            'alpha',
+            'td_error',
+        ] + twin_critic + alpha_loss + value_loss

@@ -11,8 +11,8 @@ from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseL
 from core.envs import DriveEnvWrapper
 
 
-metadrive_debug_config = dict(
-    exp_name = 'debug',
+metadrive_basic_config = dict(
+    exp_name = 'metadrive_basic_ppo',
     env=dict(
         metadrive=dict(use_render=False),
         manager=dict(
@@ -31,7 +31,7 @@ metadrive_debug_config = dict(
         model=dict(
             obs_shape=259,
             action_shape=2,
-            continuous=True,
+            #continuous=True,
         ),
         learn=dict(
             epoch_per_collect=2,
@@ -44,7 +44,7 @@ metadrive_debug_config = dict(
     ),
 )
 
-main_config = EasyDict(metadrive_debug_config)
+main_config = EasyDict(metadrive_basic_config)
 
 
 def wrapped_train_env(env_cfg):

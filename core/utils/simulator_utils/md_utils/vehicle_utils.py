@@ -14,6 +14,7 @@ class MacroDefaultVehicle(DefaultVehicle):
         self.last_macro_position = self.last_position
         self.v_wps = [[0,0], [1,1]]
         self.v_indx = 1
+        self.physics_world_step_size = self.engine.global_config["physics_world_step_size"]
 
     def before_macro_step(self, macro_action):
         if macro_action ==0:
@@ -27,13 +28,17 @@ class MacroDefaultVehicle(DefaultVehicle):
         # navi = NodeNetworkNavigation if self.engine.current_map.road_network_type == NodeRoadNetwork \
         #     else EdgeNetworkNavigation
         navi = HRLNodeNavigation
+        # print('seq len len ')
+        # print(self.engine.global_config["seq_traj_len"])
         #print('navigation rigister')
         self.navigation = \
             navi(self.engine,
                  show_navi_mark=self.engine.global_config["vehicle_config"]["show_navi_mark"],
                  random_navi_mark_color=self.engine.global_config["vehicle_config"]["random_navi_mark_color"],
                  show_dest_mark=self.engine.global_config["vehicle_config"]["show_dest_mark"],
-                 show_line_to_dest=self.engine.global_config["vehicle_config"]["show_line_to_dest"])
+                 show_line_to_dest=self.engine.global_config["vehicle_config"]["show_line_to_dest"],
+                 seq_traj_len = self.engine.global_config["seq_traj_len"],
+                 show_seq_traj = self.engine.global_config["show_seq_traj"])
 
 class MacroBaseVehicle(BaseVehicle):
 
