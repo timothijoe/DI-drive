@@ -6,44 +6,87 @@ from tensorboardX import SummaryWriter
 
 from ding.envs import BaseEnvManager, SyncSubprocessEnvManager
 from ding.config import compile_config
-from ding.policy import PPOPolicy, DQNPolicy
+from ding.policy import PPOPolicy, DDPGPolicy
+#from ding.policy.ad_sac import ADSAC
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, AdvancedReplayBuffer
 from core.envs import DriveEnvWrapper, MetaDriveMacroEnv
+from core.envs.md_hrl_env import MetaDriveHRLEnv
+from core.policy.ad_policy.traj_sac import TrajSAC
+import os
+
+z_freeze_decoder = False
+z_use_wp_decoder = False
+z_traj_seq_len = 30
+z_vae_h_dim = 64
+z_vae_latent_dim = 100
+z_dt = 0.03
 
 
+pwd = os.getcwd()
+ckpt_path = 'ckpt_files/vae_decoder_ckpt'
+ckpt_path = os.path.join(pwd, ckpt_path)
+z_episode_max_step = 500
+print(ckpt_path)
+if z_traj_seq_len == 1:
+    z_episode_max_step = z_episode_max_step * 30
+if z_use_wp_decoder:
+    z_vae_latent_dim = 2 * z_traj_seq_len
+    z_freeze_decoder = False
+if z_freeze_decoder:
+    ckpt_path = ckpt_path 
+else:
+    ckpt_path = None
+
+print(ckpt_path)
 metadrive_rush_config = dict(
-    exp_name = 'result/metadrive_macro_ppo-dqn',
+    exp_name = 'traj_len30_nord',
     env=dict(
-        metadrive=dict(use_render=True),
+        metadrive=dict(
+            use_render=False,
+            show_seq_traj = False,
+            seq_traj_len = z_traj_seq_len,
+            physics_world_step_size = z_dt,
+            episode_max_step = z_episode_max_step
+            
+        ),
         manager=dict(
             shared_memory=False,
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=2,
+        n_evaluator_episode=12,
         stop_value=99999,
-        collector_env_num=1,
-        evaluator_env_num=1,
+        collector_env_num=11,
+        evaluator_env_num=4,
         wrapper=dict(),
     ),
     policy=dict(
-        cuda=True,
+        cuda=True,         
+        freeze_decoder = z_freeze_decoder,
+        continuous=False,
         model=dict(
             obs_shape=[5, 200, 200],
-            action_shape=5,
-            encoder_hidden_size_list=[128, 128, 64],
+            action_shape=z_vae_latent_dim,
+            action_space='reparameterization',
+            actor_head_hidden_size = 64,
+            freeze_decoder = z_freeze_decoder,
+            vae_seq_len = z_traj_seq_len,
+            vae_latent_dim = z_vae_latent_dim,
+            vae_h_dim = z_vae_h_dim,
+            vae_dt = z_dt,
+            vae_load_dir = ckpt_path,
+            use_wp_decoder = z_use_wp_decoder,
         ),
         learn=dict(
+            update_per_collect=100,
             #epoch_per_collect=10,
             batch_size=64,
-            learning_rate=1e-3,
-            update_per_collect=100,
-            hook=dict(
-                load_ckpt_before_run='/home/SENSETIME/zhoutong/hoffnung/xad/result/kaifaji/dqn2/iteration_10000.pth.tar',
-            ),
+            learning_rate=3e-4,
+            auto_alpha = False,
+            alpha = 0.5,
         ),
         collect=dict(
-            n_sample=1000,
+            n_sample=5000,
         ),
         eval=dict(evaluator=dict(eval_freq=50, )),
         other=dict(
@@ -54,7 +97,17 @@ metadrive_rush_config = dict(
                 decay=10000,
             ),
             replay_buffer=dict(
-                replay_buffer_size=10000,),
+                replay_buffer_size=100000,
+                deepcopy = False,
+                max_use = float("inf"),
+                max_staleness = float("inf"),
+                alpha = 0.6,
+                beta = 0.4, 
+                anneal_step = 100000,
+                thruput_controller = {'push_sample_rate_limit': {'max': float("inf"), 'min': 0}, 'window_seconds': 30, 'sample_min_limit_ratio': 1},
+                monitor={'sampled_data_attr': {'average_range': 5, 'print_freq': 200}, 'periodic_thruput': {'seconds': 60}},
+                enable_track_used_data=False,
+                ),
         ), 
     ),
 )
@@ -63,19 +116,17 @@ main_config = EasyDict(metadrive_rush_config)
 
 
 def wrapped_env(env_cfg, wrapper_cfg=None):
-    return DriveEnvWrapper(MetaDriveMacroEnv(env_cfg), wrapper_cfg)
+    return DriveEnvWrapper(MetaDriveHRLEnv(env_cfg), wrapper_cfg) #MetaDriveMacroEnv
 
 
 def main(cfg):
     cfg = compile_config(
         cfg,
         SyncSubprocessEnvManager,
-        DQNPolicy,
+        TrajSAC,
         BaseLearner,
         SampleSerialCollector,
-        InteractionSerialEvaluator,
-        AdvancedReplayBuffer,
-        save_cfg=True
+        InteractionSerialEvaluator
     )
     print(cfg.policy.collect.collector)
 
@@ -89,7 +140,7 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    policy = DQNPolicy(cfg.policy)
+    policy = TrajSAC(cfg.policy)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
@@ -109,11 +160,10 @@ def main(cfg):
             stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
             if stop:
                 break
-            if zt >=10000:
-                break
         # Sampling data from environments
         eps = epsilon_greedy(collector.envstep)
-        new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter,policy_kwargs={'eps': eps})
+        #new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter,policy_kwargs={'eps': eps})
+        new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
         replay_buffer.push(new_data, cur_collector_envstep=collector.envstep)
         for i in range(cfg.policy.learn.update_per_collect):
             train_data = replay_buffer.sample(learner.policy.get_attribute('batch_size'), learner.train_iter)

@@ -248,7 +248,8 @@ class ManualMacroDiscretePolicy(BasePolicy):
         #print('target frame: {} with position ({}, {}) and orientation {}'.format(frame, target_pos[0], target_pos[1], heading_theta_at))
         ego_vehicle.set_position(target_pos)
         ego_vehicle.set_heading_theta(heading_theta_at)
-        ego_vehicle.last_spd = norm / 0.03
+        ego_vehicle.last_spd = norm / ego_vehicle.physics_world_step_size
+        #print(ego_vehicle.physics_world_step_size)
         #ego_vehicle.last_spd = norm / 0.03 * 3.6
         #ego_vehicle.set_velocity(heading_theta_at, norm / 0.03 *3.6)
         
