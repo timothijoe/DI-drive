@@ -241,6 +241,9 @@ class TrajSAC(SACPolicy):
         loss_dict['critic_loss'].backward()
         if self._twin_critic:
             loss_dict['twin_critic_loss'].backward()
+        for name, parms in self._model.critic.named_parameters():	
+            print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
+                ' -->grad_value:',parms.grad)
         self._optimizer_q.step()
 
         # 5. evaluate to get action distribution
@@ -283,6 +286,9 @@ class TrajSAC(SACPolicy):
         # 8. update policy network
         self._optimizer_policy.zero_grad()
         loss_dict['policy_loss'].backward()
+        for name, parms in self._model.actor.named_parameters():	
+            print('-->name:', name, '-->grad_requirs:',parms.requires_grad, \
+                ' -->grad_value:',parms.grad)
         self._optimizer_policy.step()
 
         # 9. compute alpha loss
@@ -439,6 +445,8 @@ class TrajSAC(SACPolicy):
         self._eval_model.eval()
         with torch.no_grad():
             (mu, sigma) = self._eval_model.forward(data, mode='compute_actor')['logit']
+            dist = Independent(Normal(mu, sigma), 1)
+            action = torch.tanh(dist.rsample())
             action = torch.tanh(mu)  # deterministic_eval
             output = {'action': action}
             output['latent_action'] = output['action']

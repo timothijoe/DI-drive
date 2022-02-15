@@ -1,104 +1,76 @@
 import metadrive
-import gym
 from easydict import EasyDict
 from functools import partial
 from tensorboardX import SummaryWriter
 
+from metadrive import TopDownMetaDrive
 from ding.envs import BaseEnvManager, SyncSubprocessEnvManager
 from ding.config import compile_config
-from ding.policy import PPOPolicy, DDPGPolicy
-#from ding.policy.ad_sac import ADSAC
-from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner
-from core.envs import DriveEnvWrapper, MetaDriveMacroEnv
+from ding.policy import SACPolicy
+from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, NaiveReplayBuffer
+from core.envs import DriveEnvWrapper
+from core.policy.ad_policy.conv_qac import ConvQAC
 from core.envs.md_hrl_env import MetaDriveHRLEnv
-from core.policy.ad_policy.traj_sac import TrajSAC
-import os
 
-z_freeze_decoder = True
-z_traj_seq_len = 30
-z_vae_h_dim = 64
-z_vae_latent_dim = 100
-z_dt = 0.03
-pwd = os.getcwd()
-ckpt_path = 'ckpt_files/vae_decoder_ckpt'
-ckpt_path = os.path.join(pwd, ckpt_path)
-print(ckpt_path)
-
-metadrive_rush_config = dict(
-    exp_name = 'metadrive_macro_ppo3',
+metadrive_basic_config = dict(
+    exp_name = 'metadrive_basic_sac',
     env=dict(
-        metadrive=dict(
-            use_render=True,
-            seq_traj_len = z_traj_seq_len,
-            physics_world_step_size = z_dt,
-            show_seq_traj = True,
-        ),
+        metadrive=dict(use_render=True),
         manager=dict(
             shared_memory=False,
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=3,
+        n_evaluator_episode=1,
         stop_value=99999,
         collector_env_num=1,
         evaluator_env_num=1,
-        wrapper=dict(),
     ),
     policy=dict(
-        cuda=False,         
-        freeze_decoder = z_freeze_decoder,
-        continuous=False,
+        cuda=True,
         model=dict(
             obs_shape=[5, 200, 200],
-            action_shape=100,
-            action_space='reparameterization',
-            actor_head_hidden_size = 64,
-            freeze_decoder = z_freeze_decoder,
-            vae_seq_len = z_traj_seq_len,
-            vae_latent_dim = z_vae_latent_dim,
-            vae_h_dim = z_vae_h_dim,
-            vae_dt = z_dt,
-            vae_load_dir = ckpt_path # '/home/SENSETIME/zhoutong/hoffnung/xad/result/vae_decoder_ckpt',
+            action_shape=2,
+            encoder_hidden_size_list=[128, 128, 64],
         ),
         learn=dict(
-            epoch_per_collect=10,
+            update_per_collect=100,
             batch_size=64,
             learning_rate=3e-4,
         ),
         collect=dict(
             n_sample=100,
         ),
-        eval=dict(evaluator=dict(eval_freq=50, )),
-        other=dict(
-            eps=dict(
-                type='exp',
-                start=0.95,
-                end=0.1,
-                decay=10000,
+        eval=dict(
+            evaluator=dict(
+                eval_freq=1000,
+                )
             ),
+        other=dict(
             replay_buffer=dict(
-                replay_buffer_size=1000,),
+                replay_buffer_size=1000,
+            ),
         ), 
-    ),
+    )
 )
 
-main_config = EasyDict(metadrive_rush_config)
+main_config = EasyDict(metadrive_basic_config)
 
 
 def wrapped_env(env_cfg, wrapper_cfg=None):
-    return DriveEnvWrapper(MetaDriveHRLEnv(env_cfg), wrapper_cfg) #MetaDriveMacroEnv
+    return DriveEnvWrapper(MetaDriveHRLEnv(config=env_cfg), wrapper_cfg)
 
 
 def main(cfg):
     cfg = compile_config(
         cfg,
         BaseEnvManager,
-        TrajSAC,
+        SACPolicy,
         BaseLearner,
         SampleSerialCollector,
-        InteractionSerialEvaluator
+        InteractionSerialEvaluator,
+        NaiveReplayBuffer,
     )
-    print(cfg.policy.collect.collector)
 
     collector_env_num, evaluator_env_num = cfg.env.collector_env_num, cfg.env.evaluator_env_num
     collector_env = BaseEnvManager(
@@ -110,35 +82,36 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    policy = TrajSAC(cfg.policy)
+    model = ConvQAC(**cfg.policy.model)
+    policy = SACPolicy(cfg.policy, model=model)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
     collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
     #evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
+    replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
 
     learner.call_hook('before_run')
-    zt = 0
 
     while True:
-        zt += 1
-        if(zt % 100 == 0):
-            print(zt)
-        #print(zt)
         # if evaluator.should_eval(learner.train_iter):
-        #     stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, 1)
+        #     stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
         #     if stop:
-        #         break
-        #     if zt >=100:
         #         break
         # Sampling data from environments
         new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
-        learner.train(new_data, collector.envstep)
+        replay_buffer.push(new_data, cur_collector_envstep=collector.envstep)
+        for i in range(cfg.policy.learn.update_per_collect):
+            train_data = replay_buffer.sample(learner.policy.get_attribute('batch_size'), learner.train_iter)
+            if train_data is None:
+                break
+            learner.train(train_data, collector.envstep)
     learner.call_hook('after_run')
 
     collector.close()
     evaluator.close()
     learner.close()
+
 
 if __name__ == '__main__':
     main(main_config)

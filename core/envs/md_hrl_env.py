@@ -27,6 +27,8 @@ from metadrive.utils import Config, merge_dicts, get_np_random, concat_step_info
 from metadrive.envs.base_env import BASE_DEFAULT_CONFIG
 from metadrive.obs.top_down_obs_multi_channel import TopDownMultiChannel
 from metadrive.utils.utils import auto_termination
+from core.policy.ad_policy.traj_vae import VaeDecoder
+import torch
 
 DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
@@ -95,10 +97,10 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # ===== Termination Scheme =====
     out_of_route_done=True,
-    physics_world_step_size=3e-2,
+    physics_world_step_size=1e-1,
 
     # ===== Trajectory length =====
-    seq_traj_len = 30,
+    seq_traj_len = 10,
     show_seq_traj = False,
     episode_max_step = 500,
 
@@ -153,6 +155,16 @@ class MetaDriveHRLEnv(BaseEnv):
         self.time = 0
         self.step_num = 0
         self.episode_rwd = 0
+        self.vae_decoder = VaeDecoder(
+                embedding_dim = 64,
+                h_dim = 64,
+                latent_dim = 2,
+                seq_len = 10,
+                dt = 0.1
+            )
+        vae_load_dir = 'ckpt_files/a79_decoder_ckpt'
+        self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
+        self.vel_speed = 0.0
 
     # define a action type, and execution style
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
@@ -166,6 +178,21 @@ class MetaDriveHRLEnv(BaseEnv):
         #         action_seq.append([actions[2 * i], actions[2 *i+1]])
         #     actions = action_seq
         #action_seq =  np.array(action_seq)
+        init_state = np.zeros([1, 4])
+        init_state[0,3] = self.vel_speed
+        init_state = torch.from_numpy(init_state)
+        #actions = np.array([1,1])
+        if isinstance(actions, np.ndarray):
+            batch_action = torch.from_numpy(actions)
+            batch_action = torch.unsqueeze(batch_action, 0)
+            batch_action = batch_action.to(torch.float32)
+            init_state = init_state.to(torch.float32)
+            with torch.no_grad():
+                trajs = self.vae_decoder(batch_action, init_state)
+            trajs = torch.cat([init_state.unsqueeze(1), trajs], dim = 1)
+            trajs = trajs[:,:,:2]
+            trajs = torch.squeeze(trajs, 0)
+            actions = trajs.numpy()
         macro_actions = self._preprocess_macro_waypoints(actions)
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
@@ -328,7 +355,7 @@ class MetaDriveHRLEnv(BaseEnv):
         else:
             lateral_factor = 1.0
         longitude_factor = 0.2
-        heading_factor = 0.5
+        heading_factor = 1.5
         
         #heading_theta_rwd = 5 - 2 * np.abs(theta_error) 
 
@@ -336,7 +363,7 @@ class MetaDriveHRLEnv(BaseEnv):
         max_spd = 10
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor *  longitude_factor * positive_road 
         reward += self.config["speed_reward"] * (vehicle.last_spd / max_spd) * positive_road
-        reward += max(heading_factor * ( 1 - np.abs(theta_error)), 0)
+        reward += heading_factor * ( 1 - np.abs(theta_error))
         step_info["step_reward"] = reward
 
         if vehicle.arrive_destination:
@@ -392,13 +419,14 @@ class MetaDriveHRLEnv(BaseEnv):
             # o[0,1,1] = 0
             # o[0,2,1] = 0
             # o[0,3,1] = v.last_spd
+            self.vel_speed = v.last_spd
             # append the six-th 
             #v_o = np.ones([200, 200, 1]) * v.last_spd * 0.01
             #o = np.concatenate((o, v_o), axis = 2)
-            o_dict = {}
-            o_dict['birdview'] = o 
-            o_dict['speed'] = v.last_spd
-            obses[v_id] =  o_dict #o
+            # o_dict = {}
+            # o_dict['birdview'] = o 
+            # o_dict['speed'] = v.last_spd
+            obses[v_id] =  o #o_dict
             done_function_result, done_infos[v_id] = self.done_function(v_id)
             rewards[v_id], reward_infos[v_id] = self.reward_function(v_id)
             _, cost_infos[v_id] = self.cost_function(v_id)
@@ -530,6 +558,7 @@ class MetaDriveHRLEnv(BaseEnv):
             o_dict['birdview'] = o 
             o_dict['speed'] = v.last_spd
             #obses[v_id] =  o_dict #o
+            self.vel_speed = 0
 
             if hasattr(v, 'macro_succ'):
                 v.macro_succ = False
@@ -545,7 +574,7 @@ class MetaDriveHRLEnv(BaseEnv):
         #         print('target velocity: {}'.format(target_speed))
         #         v.set_velocity(v.heading, target_speed)
         if self.remove_init_stop:
-            return o_dict
+            return o #o_dict
         for i in range(8):
             o, r, d, info = self.step(self.action_type.actions_indexes["Holdon"])
         for v_id ,v in self.vehicles.items():
