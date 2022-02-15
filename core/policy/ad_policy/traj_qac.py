@@ -168,7 +168,8 @@ class TrajQAC(nn.Module):
                 actor_head_layer_num,
                 sigma_type='conditioned',
                 activation=activation,
-                norm_type=norm_type              
+                norm_type=norm_type,
+                #bound_type = 'tanh',              
             )
         self.actor = nn.Sequential(self.encoder, self.actor_head)
         self.critic = nn.ModuleList([self.encoder, self.critic_head])

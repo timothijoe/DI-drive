@@ -16,7 +16,7 @@ z_freeze_decoder = True
 z_use_wp_decoder = False
 z_traj_seq_len = 10
 z_vae_h_dim = 64
-z_vae_latent_dim = 3
+z_vae_latent_dim = 2
 z_dt = 0.1
 
 
@@ -63,7 +63,7 @@ metadrive_rush_config = dict(
         freeze_decoder = z_freeze_decoder,
         continuous=False,
         model=dict(
-            obs_shape=[6, 200, 200],
+            obs_shape=[5, 200, 200],
             action_shape=z_vae_latent_dim,
             action_space='reparameterization',
             actor_head_hidden_size = 64,
@@ -140,7 +140,7 @@ def main(cfg):
 
     policy = TrajSAC(cfg.policy)
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/iteration_1200.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/iteration_99900.pth.tar', map_location = 'cpu'))
 
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
