@@ -6,7 +6,7 @@ class MacroIDMPolicy(IDMPolicy):
 
     def __init__(self, control_object, random_seed):
         super(MacroIDMPolicy, self).__init__(control_object=control_object, random_seed=random_seed)
-        self.NORMAL_SPEED_CONST = 50
+        self.NORMAL_SPEED_CONST = 15
         self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
         self.LANE_CHANGE_FREQ = 300
 

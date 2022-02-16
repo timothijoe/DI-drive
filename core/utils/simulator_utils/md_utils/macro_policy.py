@@ -211,6 +211,8 @@ class ManualMacroDiscretePolicy(BasePolicy):
             self.base_pos = ego_vehicle.position
             self.base_heading = ego_vehicle.heading_theta
             self.control_object.v_wps = self.convert_waypoint_list_coord(self.base_pos, self.base_heading,wp_list, True)
+            self.control_object.penultimate_state = self.control_object.traj_wp_list[-2]
+            self.control_object.traj_wp_list = []
         #frame = 0
         self.control_object.v_indx = frame 
         wp_list = self.convert_waypoint_list_coord(self.base_pos, self.base_heading, wp_list)
@@ -249,6 +251,11 @@ class ManualMacroDiscretePolicy(BasePolicy):
         ego_vehicle.set_position(target_pos)
         ego_vehicle.set_heading_theta(heading_theta_at)
         ego_vehicle.last_spd = norm / ego_vehicle.physics_world_step_size
+        new_state = {}
+        new_state['position'] = target_pos
+        new_state['yaw'] = heading_theta_at
+        new_state['speed'] = ego_vehicle.last_spd
+        self.control_object.traj_wp_list.append(new_state)
         #print(ego_vehicle.physics_world_step_size)
         #ego_vehicle.last_spd = norm / 0.03 * 3.6
         #ego_vehicle.set_velocity(heading_theta_at, norm / 0.03 *3.6)

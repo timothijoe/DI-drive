@@ -104,6 +104,9 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     show_seq_traj = False,
     episode_max_step = 500,
 
+    use_jerk_penalty = False,
+    use_lateral_penalty = False,
+
 
 )
 
@@ -331,6 +334,7 @@ class MetaDriveHRLEnv(BaseEnv):
         :return: reward
         """
         vehicle = self.vehicles[vehicle_id]
+        
         step_info = dict()
 
         # Reward for moving forward in current lane
@@ -364,7 +368,14 @@ class MetaDriveHRLEnv(BaseEnv):
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor *  longitude_factor * positive_road 
         reward += self.config["speed_reward"] * (vehicle.last_spd / max_spd) * positive_road
         reward += heading_factor * ( 1 - np.abs(theta_error))
+        jerk_value = self.compute_jerk_penalty(vehicle)
+        lateral_penalty = self.compute_lateral_penalty(vehicle, current_lane)
+        if self.config["use_jerk_penalty"]:
+            reward -= jerk_value / 4000.0
+        if self.config["use_lateral_penalty"]:
+            reward -= lateral_penalty /2.0
         step_info["step_reward"] = reward
+
 
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
@@ -381,6 +392,44 @@ class MetaDriveHRLEnv(BaseEnv):
         elif self.step_num >= self.config["episode_max_step"]:
             reward = - self.config["run_out_of_time_penalty"]
         return reward, step_info
+
+    def compute_jerk_penalty(self, vehicle):
+        jerk_list = []
+        #vehicle = self.vehicles[vehicle_id]
+        v_t0 = vehicle.penultimate_state['speed']
+        theta_t0 = vehicle.penultimate_state['yaw']
+        v_t1 = vehicle.traj_wp_list[0]['speed']
+        theta_t1 = vehicle.traj_wp_list[0]['yaw']
+        v_t2 = vehicle.traj_wp_list[1]['speed']
+        theta_t2 = vehicle.traj_wp_list[1]['yaw']
+        t_inverse = 1.0 / self.config['physics_world_step_size']
+        first_point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + 2 * v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+        first_point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + 2 * v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
+        jerk_list.append(np.array([first_point_jerk_x, first_point_jerk_y]))
+        for i in range(2, self.config['seq_traj_len']):
+            v_t0 = vehicle.traj_wp_list[i-2]['speed']
+            theta_t0 = vehicle.traj_wp_list[i-2]['yaw']
+            v_t1 = vehicle.traj_wp_list[i-1]['speed']
+            theta_t1 = vehicle.traj_wp_list[i-1]['yaw']
+            v_t2 = vehicle.traj_wp_list[i]['speed']
+            theta_t2 = vehicle.traj_wp_list[i]['yaw']    
+            point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + 2 * v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+            point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + 2 * v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
+            jerk_list.append(np.array([point_jerk_x, point_jerk_y]))
+        final_jerk_value = 0
+        for jerk in jerk_list:
+            final_jerk_value += np.linalg.norm(jerk)
+        return final_jerk_value
+
+    def compute_lateral_penalty(self, vehicle, lane):
+        final_lateral_value = 0
+        for i in range(1, self.config['seq_traj_len']):
+            long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
+            final_lateral_value += np.abs(lateral_now)
+        final_lateral_value /= float(self.config['seq_traj_len'])
+        return final_lateral_value
+            
+
 
     def switch_to_third_person_view(self) -> None:
         if self.main_camera is None:
