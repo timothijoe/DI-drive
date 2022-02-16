@@ -4,6 +4,7 @@ from core.utils.simulator_utils.md_utils.navigation_utils import HRLNodeNavigati
 from typing import Union, Dict, AnyStr, Tuple
 from core.utils.simulator_utils.md_utils.idm_policy_utils import MacroIDMPolicy
 from metadrive.component.vehicle.vehicle_type import DefaultVehicle
+import copy
 class MacroDefaultVehicle(DefaultVehicle):
 
     def __init__(self, vehicle_config: Union[dict, Config] = None, name: str = None, random_seed=None):
@@ -15,6 +16,13 @@ class MacroDefaultVehicle(DefaultVehicle):
         self.v_wps = [[0,0], [1,1]]
         self.v_indx = 1
         self.physics_world_step_size = self.engine.global_config["physics_world_step_size"]
+        self.penultimate_state = {}
+        self.penultimate_state['position'] = self.last_position
+        self.penultimate_state['yaw'] = 0 
+        self.penultimate_state['speed'] = 0
+        self.traj_wp_list = [] 
+        self.traj_wp_list.append(copy.deepcopy(self.penultimate_state))
+        self.traj_wp_list.append(copy.deepcopy(self.penultimate_state))
 
     def before_macro_step(self, macro_action):
         if macro_action ==0:
