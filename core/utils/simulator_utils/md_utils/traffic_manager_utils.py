@@ -116,8 +116,8 @@ class MacroTrafficManager(TrafficManager):
             vehicle_num += len(vehicles_on_block)
         self.block_triggered_vehicles.reverse()
         respawn_lanes = self._get_available_respawn_lanes(map)
-        for lane in respawn_lanes:
-            self._traffic_vehicles += self._create_respawn_vehicles_with_density(traffic_density, lane, True)
+        # for lane in respawn_lanes:
+        #     self._traffic_vehicles += self._create_respawn_vehicles_with_density(traffic_density, lane, True)
 
     def _create_respawn_vehicles_with_density(self, traffic_density: float, lane: AbstractLane, is_respawn_lane):
         """
