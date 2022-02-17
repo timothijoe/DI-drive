@@ -15,7 +15,8 @@ from core.envs.md_hrl_env import MetaDriveHRLEnv
 metadrive_basic_config = dict(
     exp_name='metadrive_tdv_ppo',
     env=dict(
-        metadrive=dict(use_render=True),
+        metadrive=dict(use_render=True,
+        show_seq_traj=True,),
         manager=dict(
             shared_memory=False,
             max_retry=2,

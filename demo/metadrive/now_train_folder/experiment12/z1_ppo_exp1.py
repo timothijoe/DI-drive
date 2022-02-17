@@ -10,26 +10,25 @@ from ding.policy import PPOPolicy
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner
 from core.envs import DriveEnvWrapper
 from core.policy.ad_policy.conv_vac import ConvVAC
-from core.envs.md_hrl_env import MetaDriveHRLEnv
+from core.envs.md_control_env import MetaDriveControlEnv
 
 metadrive_basic_config = dict(
-    exp_name='ppo_jerk_lateral_and_density',
+    exp_name='exp1_ppo',
     env=dict(
         metadrive=dict(
             use_render=False,
-            use_jerk_penalty = True,
-            use_lateral_penalty = True,
-            traffic_density = 0.1,
+            traffic_density = 0.2,
+            seq_traj_len = 1,
         ),
         manager=dict(
             shared_memory=False,
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=6,
+        n_evaluator_episode=1,
         stop_value=99999,
         collector_env_num=11,
-        evaluator_env_num=3,
+        evaluator_env_num=1,
     ),
     policy=dict(
         cuda=True,
@@ -60,7 +59,7 @@ main_config = EasyDict(metadrive_basic_config)
 
 
 def wrapped_env(env_cfg, wrapper_cfg=None):
-    return DriveEnvWrapper(MetaDriveHRLEnv(config=env_cfg), wrapper_cfg)
+    return DriveEnvWrapper(MetaDriveControlEnv(config=env_cfg), wrapper_cfg)
 
 
 def main(cfg):

@@ -262,10 +262,11 @@ class WpDecoder(nn.Module):
         y_t = prev_state[:,1]
         psi_t = prev_state[:,2]
         v_t = prev_state[:,3]
+        steering_batch = steering_batch * 2
         #pedal_batch = torch.clamp(pedal_batch, -5, 5)
         steering_batch = torch.clamp(steering_batch, -0.5, 0.5)
         beta = steering_batch
-        a_t = pedal_batch
+        a_t = pedal_batch * 4
         v_t_1 = v_t + a_t * dt 
         v_t_1 = torch.clamp(v_t_1, 0, 10)
         psi_dot = v_t * torch.tan(beta) / 2.5

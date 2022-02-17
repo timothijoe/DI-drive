@@ -26,7 +26,7 @@ metadrive_basic_config = dict(
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=1,
+        n_evaluator_episode=6,
         stop_value=99999,
         collector_env_num=11,
         evaluator_env_num=3,
