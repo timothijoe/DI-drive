@@ -13,12 +13,13 @@ from core.policy.ad_policy.conv_qac import ConvQAC
 from core.envs.md_hrl_env import MetaDriveHRLEnv
 
 metadrive_basic_config = dict(
-    exp_name = 'jerk_lateral',
+    exp_name = 'sac_only_jerk',
     env=dict(
         metadrive=dict(
             use_render=False,
             use_jerk_penalty = True,
-            use_lateral_penalty = True,
+            use_lateral_penalty = False,
+            traffic_density = 0.0,
             ),
         manager=dict(
             shared_memory=False,

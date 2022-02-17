@@ -367,13 +367,15 @@ class MetaDriveHRLEnv(BaseEnv):
         max_spd = 10
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor *  longitude_factor * positive_road 
         reward += self.config["speed_reward"] * (vehicle.last_spd / max_spd) * positive_road
-        reward += heading_factor * ( 1 - np.abs(theta_error))
+        if vehicle.last_spd<4:
+            reward -= 0.4
+        reward += heading_factor * ( 0 - np.abs(theta_error))
         jerk_value = self.compute_jerk_penalty(vehicle)
         lateral_penalty = self.compute_lateral_penalty(vehicle, current_lane)
         if self.config["use_jerk_penalty"]:
-            reward -= jerk_value / 4000.0
+            reward -= jerk_value / 6000.0
         if self.config["use_lateral_penalty"]:
-            reward -= lateral_penalty /2.0
+            reward -= lateral_penalty /4.0
         step_info["step_reward"] = reward
 
 
