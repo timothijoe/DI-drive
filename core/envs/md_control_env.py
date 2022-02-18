@@ -373,10 +373,10 @@ class MetaDriveControlEnv(BaseEnv):
         
         if self.config["use_jerk_penalty"]:
             jerk_value = self.compute_jerk_penalty(vehicle)
-            reward -= jerk_value / 6000.0
+            reward += (0.04-jerk_value / 200.0) 
         if self.config["use_lateral_penalty"]:
             lateral_penalty = self.compute_lateral_penalty(vehicle, current_lane)
-            reward -= lateral_penalty /4.0
+            reward -= lateral_penalty /4.0 * 0.3
         step_info["step_reward"] = reward
 
 
@@ -406,18 +406,19 @@ class MetaDriveControlEnv(BaseEnv):
         v_t2 = vehicle.traj_wp_list[1]['speed']
         theta_t2 = vehicle.traj_wp_list[1]['yaw']
         t_inverse = 1.0 / self.config['physics_world_step_size']
-        first_point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + 2 * v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
-        first_point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + 2 * v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
+        first_point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) +  v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+        first_point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) +  v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
         jerk_list.append(np.array([first_point_jerk_x, first_point_jerk_y]))
-        for i in range(2, self.config['seq_traj_len']):
+        # plus one because we store the current value as first, which means the whole trajectory is seq_traj_len + 1
+        for i in range(2, self.config['seq_traj_len'] + 1):
             v_t0 = vehicle.traj_wp_list[i-2]['speed']
             theta_t0 = vehicle.traj_wp_list[i-2]['yaw']
             v_t1 = vehicle.traj_wp_list[i-1]['speed']
             theta_t1 = vehicle.traj_wp_list[i-1]['yaw']
             v_t2 = vehicle.traj_wp_list[i]['speed']
             theta_t2 = vehicle.traj_wp_list[i]['yaw']    
-            point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + 2 * v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
-            point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + 2 * v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
+            point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+            point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
             jerk_list.append(np.array([point_jerk_x, point_jerk_y]))
         final_jerk_value = 0
         for jerk in jerk_list:
@@ -426,7 +427,7 @@ class MetaDriveControlEnv(BaseEnv):
 
     def compute_lateral_penalty(self, vehicle, lane):
         final_lateral_value = 0
-        for i in range(1, self.config['seq_traj_len']):
+        for i in range(1, self.config['seq_traj_len'] +1):
             long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
             final_lateral_value += np.abs(lateral_now)
         final_lateral_value /= float(self.config['seq_traj_len'])
@@ -616,6 +617,14 @@ class MetaDriveControlEnv(BaseEnv):
                 v.macro_succ = False
             if hasattr(v, 'macro_crash'):
                 v.macro_crash = False
+            v.penultimate_state = {}
+            v.penultimate_state['position'] = np.array([0,0])
+            v.penultimate_state['yaw'] = 0 
+            v.penultimate_state['speed'] = 0
+            v.traj_wp_list = [] 
+            v.traj_wp_list.append(copy.deepcopy(v.penultimate_state))
+            v.traj_wp_list.append(copy.deepcopy(v.penultimate_state))
+            v.last_spd = 0
         # zt_obs = zt_obs.transpose((2,0,1))
         # print('process: {}  --- > initializing: a new episode begins'.format(os.getpid()))
         self.remove_init_stop = True
@@ -678,6 +687,6 @@ class MetaDriveControlEnv(BaseEnv):
 
 
 register(
-    id='HRL-v1',
+    id='Control-v1',
     entry_point='core.envs.md_macro_env:MetaDriveControlEnv',
 )

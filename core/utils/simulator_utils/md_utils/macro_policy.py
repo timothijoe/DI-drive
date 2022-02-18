@@ -211,8 +211,13 @@ class ManualMacroDiscretePolicy(BasePolicy):
             self.base_pos = ego_vehicle.position
             self.base_heading = ego_vehicle.heading_theta
             self.control_object.v_wps = self.convert_waypoint_list_coord(self.base_pos, self.base_heading,wp_list, True)
-            self.control_object.penultimate_state = self.control_object.traj_wp_list[-2] if len(wp_list)>2 else self.control_object.traj_wp_list[-1]
+            self.control_object.penultimate_state = self.control_object.traj_wp_list[-2] # if len(wp_list)>2 else self.control_object.traj_wp_list[-1]
+            new_state = {}        
+            new_state['position'] = ego_vehicle.position
+            new_state['yaw'] = ego_vehicle.heading_theta
+            new_state['speed'] = ego_vehicle.last_spd
             self.control_object.traj_wp_list = []
+            self.control_object.traj_wp_list.append(new_state)
         #frame = 0
         self.control_object.v_indx = frame 
         wp_list = self.convert_waypoint_list_coord(self.base_pos, self.base_heading, wp_list)

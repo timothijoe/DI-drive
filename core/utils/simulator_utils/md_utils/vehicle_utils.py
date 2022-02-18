@@ -11,13 +11,14 @@ class MacroDefaultVehicle(DefaultVehicle):
         super(MacroDefaultVehicle, self).__init__(vehicle_config, name, random_seed)
         self.macro_succ = False
         self.macro_crash = False
-        self.last_spd = 1
+        self.last_spd = 0
         self.last_macro_position = self.last_position
         self.v_wps = [[0,0], [1,1]]
         self.v_indx = 1
         self.physics_world_step_size = self.engine.global_config["physics_world_step_size"]
         self.penultimate_state = {}
-        self.penultimate_state['position'] = self.last_position
+        import numpy as np
+        self.penultimate_state['position'] = np.array([0,0]) #self.last_position
         self.penultimate_state['yaw'] = 0 
         self.penultimate_state['speed'] = 0
         self.traj_wp_list = [] 
