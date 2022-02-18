@@ -36,10 +36,11 @@ class MacroAgentManager(AgentManager):
             policy = self.engine.get_policy(self._agent_to_object[agent_id])
             if agent_id in wps.keys():
                 waypoints = wps[agent_id]
+            self.get_agent(agent_id).before_macro_step(frame)
             action = policy.act(agent_id, frame, waypoints)
             step_infos[agent_id] = policy.get_action_info()
             step_infos[agent_id].update(self.get_agent(agent_id).before_step(action))
-            self.get_agent(agent_id).before_macro_step(frame)
+            
 
         finished = set()
         for v_name in self._dying_objects.keys():

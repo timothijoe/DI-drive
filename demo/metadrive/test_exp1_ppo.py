@@ -12,17 +12,17 @@ from core.envs import DriveEnvWrapper
 from core.policy.ad_policy.conv_vac import ConvVAC
 from core.envs.md_hrl_env import MetaDriveHRLEnv
 from ding.policy import PPOPolicy
-
+from core.envs.md_control_env import MetaDriveControlEnv
 metadrive_basic_config = dict(
     exp_name='metadrive_tdv_ppo',
     env=dict(
         metadrive=dict(
         use_render=True,
         show_seq_traj=True,
+        traffic_density = 0.2,
         use_jerk_penalty = True,
         use_lateral_penalty = True,
-        traffic_density = 0.3,
-        seq_traj_len = 10,
+        seq_traj_len = 1,
         ),
         manager=dict(
             shared_memory=False,
@@ -63,7 +63,7 @@ main_config = EasyDict(metadrive_basic_config)
 
 
 def wrapped_env(env_cfg, wrapper_cfg=None):
-    return DriveEnvWrapper(MetaDriveHRLEnv(config=env_cfg), wrapper_cfg)
+    return DriveEnvWrapper(MetaDriveControlEnv(config=env_cfg), wrapper_cfg)
 
 
 def main(cfg):
@@ -91,7 +91,7 @@ def main(cfg):
 
 
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb17/ppo/exp3/iteration_30000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb17/ppo/exp1/iteration_340000.pth.tar', map_location = 'cpu'))
 
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
