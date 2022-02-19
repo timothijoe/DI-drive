@@ -90,7 +90,7 @@ def main(cfg):
     policy = SACPolicy(cfg.policy, model=model)
 
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb17/jerk_lateral_density/iteration_7000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb19/exp3/sac_jerk_lateral_no_traffic.pth.tar', map_location = 'cpu'))
 
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))

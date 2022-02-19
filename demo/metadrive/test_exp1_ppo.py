@@ -19,7 +19,7 @@ metadrive_basic_config = dict(
         metadrive=dict(
         use_render=True,
         show_seq_traj=True,
-        traffic_density = 0.2,
+        traffic_density = 0.3,
         use_jerk_penalty = True,
         use_lateral_penalty = True,
         seq_traj_len = 1,
@@ -91,7 +91,7 @@ def main(cfg):
 
 
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb17/ppo/exp1/iteration_340000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb17/ppo/exp1/iteration_260000.pth.tar', map_location = 'cpu'))
 
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
