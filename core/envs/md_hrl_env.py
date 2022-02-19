@@ -89,6 +89,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     driving_reward=1.0,
     speed_reward=0.5,
     use_lateral=True,
+    lateral_scale = 0.5,
 
     # ===== Cost Scheme =====
     crash_vehicle_cost=1.0,
@@ -359,10 +360,11 @@ class MetaDriveHRLEnv(BaseEnv):
         vehicle_heading_theta = vehicle.heading_theta
         road_heading_theta = current_lane.heading
         theta_error = self.wrap_angle(vehicle_heading_theta - road_heading_theta)
+        lateral_scale = self.config["lateral_scale"]
 
         # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
         if self.config["use_lateral"]:
-            lateral_factor = clip(1 - 0.5 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            lateral_factor = clip(1 - lateral_scale * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
             #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
         else:
             lateral_factor = 1.0
