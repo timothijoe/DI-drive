@@ -22,7 +22,7 @@ metadrive_basic_config = dict(
         use_jerk_penalty = True,
         use_lateral_penalty = True,
         traffic_density = 0.3,
-        seq_traj_len = 10,
+        seq_traj_len = 20,
         ),
         manager=dict(
             shared_memory=False,
@@ -91,7 +91,7 @@ def main(cfg):
 
 
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb17/ppo/exp3/iteration_30000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb19/exp3/ppo_only_jerk_len_20.tar', map_location = 'cpu'))
 
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))

@@ -369,11 +369,13 @@ class MetaDriveControlEnv(BaseEnv):
         if vehicle.last_spd<4:
             reward -= 0.04
         reward += heading_factor * ( 0 - np.abs(theta_error))
+        # if np.abs(long_now- long_last) < 0.0001:
+        #     reward -= 0.02
         
         
         if self.config["use_jerk_penalty"]:
             jerk_value = self.compute_jerk_penalty(vehicle)
-            reward += (0.04-jerk_value / 200.0) 
+            reward += (0.03-jerk_value / 200.0) 
         if self.config["use_lateral_penalty"]:
             lateral_penalty = self.compute_lateral_penalty(vehicle, current_lane)
             reward -= lateral_penalty /4.0 * 0.3

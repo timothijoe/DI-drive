@@ -168,12 +168,12 @@ class MetaDriveHRLEnv(BaseEnv):
         # vae_load_dir = 'ckpt_files/a79_decoder_ckpt'
         # vae_load_dir = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_20_79_decoder_ckpt'
         if self.config['seq_traj_len'] == 10:
-            vae_load_dir = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_10_decoder_ckpt'
+            vae_load_dir = 'ckpt_files/seq_len_10_decoder_ckpt'
         elif self.config['seq_traj_len'] == 15:
-            vae_load_dir = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_15_78_decoder_ckpt'
+            vae_load_dir = 'ckpt_files/seq_len_15_78_decoder_ckpt'
         else:
             assert self.config['seq_traj_len'] == 20
-            vae_load_dir = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_20_79_decoder_ckpt'
+            vae_load_dir = 'ckpt_files/seq_len_20_79_decoder_ckpt'
         self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
         self.vel_speed = 0.0
 
