@@ -34,7 +34,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
     start_seed=0,
     use_render=False,
-    environment_num=1,
+    environment_num=5,
 
     # ===== Map Config =====
     map='SSSSSSSSSS',  # int or string: an easy way to fill map_config
@@ -358,7 +358,7 @@ class MetaDriveHRLEnv(BaseEnv):
         long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
 
         vehicle_heading_theta = vehicle.heading_theta
-        road_heading_theta = current_lane.heading
+        road_heading_theta = current_lane.heading_theta_at(long_now)
         theta_error = self.wrap_angle(vehicle_heading_theta - road_heading_theta)
         lateral_scale = self.config["lateral_scale"]
 
@@ -383,7 +383,7 @@ class MetaDriveHRLEnv(BaseEnv):
         jerk_value = self.compute_jerk_penalty(vehicle)
         lateral_penalty = self.compute_lateral_penalty(vehicle, current_lane)
         if self.config["use_jerk_penalty"]:
-            reward += (0.4-jerk_value / 200.0)
+            reward += (0.3-jerk_value / 200.0)
         if self.config["use_lateral_penalty"]:
             reward -= lateral_penalty /4.0
         step_info["step_reward"] = reward

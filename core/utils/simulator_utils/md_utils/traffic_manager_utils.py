@@ -56,9 +56,10 @@ class MacroTrafficManager(TrafficManager):
         elif self.mode == TrafficMode.Synch:
             #self._create_respawn_vehicles(map, traffic_density)
             self._create_synch_vehicles(map, traffic_density)
+            self.trigger_vehicles()
         else:
             raise ValueError("No such mode named {}".format(self.mode))
-        self.trigger_vehicles()
+        
 
     def trigger_vehicles(self):
         # This will triger all static vehicles to move
