@@ -49,8 +49,8 @@ class MacroIDMPolicy(IDMPolicy):
             all_objects, self.routing_target_lane, self.control_object.position, self.MAX_LONG_DIST, current_lanes
         )
         if not surrounding_objects.right_lane_exist():
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST -10
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST -4
         elif not surrounding_objects.left_lane_exist():
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 10
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 4
         else:
             self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
