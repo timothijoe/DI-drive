@@ -16,7 +16,7 @@ metadrive_basic_config = dict(
     exp_name='exp1_ppo',
     env=dict(
         metadrive=dict(
-            use_render=False,
+            use_render=True,
             traffic_density = 0.2,
             seq_traj_len = 1,
         ),
@@ -27,7 +27,7 @@ metadrive_basic_config = dict(
         ),
         n_evaluator_episode=1,
         stop_value=99999,
-        collector_env_num=11,
+        collector_env_num=1,
         evaluator_env_num=1,
     ),
     policy=dict(

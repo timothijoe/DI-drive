@@ -161,7 +161,7 @@ class MetaDriveControlEnv(BaseEnv):
         self.episode_rwd = 0
         self.vae_decoder = WpDecoder(
                 control_num = 2,
-                seq_len = 1,
+                seq_len = self.config['seq_traj_len'],
                 dt = 0.1
             )
         vae_load_dir = 'ckpt_files/a79_decoder_ckpt'
@@ -348,7 +348,7 @@ class MetaDriveControlEnv(BaseEnv):
         long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
 
         vehicle_heading_theta = vehicle.heading_theta
-        road_heading_theta = current_lane.heading
+        road_heading_theta = current_lane.heading_theta_at(long_now)
         theta_error = self.wrap_angle(vehicle_heading_theta - road_heading_theta)
 
         # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
@@ -358,14 +358,14 @@ class MetaDriveControlEnv(BaseEnv):
         else:
             lateral_factor = 1.0
         longitude_factor = 0.2
-        heading_factor = 0.15
+        heading_factor = 0.15 * float(self.config["seq_traj_len"])
         
         #heading_theta_rwd = 5 - 2 * np.abs(theta_error) 
 
         reward = 0.0
         max_spd = 10
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor *  longitude_factor * positive_road 
-        reward += self.config["speed_reward"] * (vehicle.last_spd / max_spd) * positive_road * 0.1
+        reward += self.config["speed_reward"] * (vehicle.last_spd / max_spd) * positive_road * 0.1 * float(self.config["seq_traj_len"])
         if vehicle.last_spd<4:
             reward -= 0.04
         reward += heading_factor * ( 0 - np.abs(theta_error))
@@ -375,7 +375,7 @@ class MetaDriveControlEnv(BaseEnv):
         
         if self.config["use_jerk_penalty"]:
             jerk_value = self.compute_jerk_penalty(vehicle)
-            reward += (0.03-jerk_value / 200.0) 
+            reward += (0.03 *float(self.config["seq_traj_len"]) -jerk_value / 200.0) 
         if self.config["use_lateral_penalty"]:
             lateral_penalty = self.compute_lateral_penalty(vehicle, current_lane)
             reward -= lateral_penalty /4.0 * 0.3

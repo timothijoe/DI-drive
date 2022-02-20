@@ -383,7 +383,7 @@ class MetaDriveHRLEnv(BaseEnv):
         jerk_value = self.compute_jerk_penalty(vehicle)
         lateral_penalty = self.compute_lateral_penalty(vehicle, current_lane)
         if self.config["use_jerk_penalty"]:
-            reward += (0.3-jerk_value / 200.0)
+            reward += (0.3-jerk_value / 200.0) * 2
         if self.config["use_lateral_penalty"]:
             reward -= lateral_penalty /4.0
         step_info["step_reward"] = reward
@@ -431,6 +431,7 @@ class MetaDriveHRLEnv(BaseEnv):
         final_jerk_value = 0
         for jerk in jerk_list:
             final_jerk_value += np.linalg.norm(jerk)
+            #final_jerk_value += np.abs(jerk[1]) * 2
         return final_jerk_value
 
     def compute_lateral_penalty(self, vehicle, lane):
