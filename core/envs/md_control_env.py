@@ -29,6 +29,7 @@ from metadrive.obs.top_down_obs_multi_channel import TopDownMultiChannel
 from metadrive.utils.utils import auto_termination
 #from core.policy.ad_policy.traj_vae import VaeDecoder
 from core.policy.ad_policy.traj_vae import WpDecoder
+from core.policy.ad_policy.traj_vae import CCDecoder
 import torch
 
 DIDRIVE_DEFAULT_CONFIG = dict(
@@ -87,8 +88,9 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     crash_vehicle_penalty=1.0,
     crash_object_penalty=5.0,
     run_out_of_time_penalty = 5.0,
-    driving_reward=1.0,
-    speed_reward=0.5,
+    driving_reward= 0.2,  #1.0,
+    speed_reward=0.05,
+    heading_reward = 0.15, 
     use_lateral=True,
 
     # ===== Cost Scheme =====
@@ -103,10 +105,12 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Trajectory length =====
     seq_traj_len = 10,
     show_seq_traj = False,
-    episode_max_step = 5000,
+    episode_max_step = 500,
 
     use_jerk_penalty = False,
     use_lateral_penalty = False,
+    const_control = True,
+    half_jerk = False,
 
 
 )
@@ -159,7 +163,14 @@ class MetaDriveControlEnv(BaseEnv):
         self.time = 0
         self.step_num = 0
         self.episode_rwd = 0
-        self.vae_decoder = WpDecoder(
+        if not self.config["const_control"]:
+            self.vae_decoder = WpDecoder(
+                control_num = 2,
+                seq_len = self.config['seq_traj_len'],
+                dt = 0.1
+                )
+        else:
+            self.vae_decoder = CCDecoder(
                 control_num = 2,
                 seq_len = self.config['seq_traj_len'],
                 dt = 0.1
@@ -347,38 +358,44 @@ class MetaDriveControlEnv(BaseEnv):
         long_last, _ = current_lane.local_coordinates(vehicle.last_macro_position)
         long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
 
-        vehicle_heading_theta = vehicle.heading_theta
-        road_heading_theta = current_lane.heading_theta_at(long_now)
-        theta_error = self.wrap_angle(vehicle_heading_theta - road_heading_theta)
-
+        avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
+        use_lateral_penalty = False
         # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
         if self.config["use_lateral"]:
-            lateral_factor = clip(1 - 0.5 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
             #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
         else:
             lateral_factor = 1.0
-        longitude_factor = 0.2
-        heading_factor = 0.15 * float(self.config["seq_traj_len"])
-        
-        #heading_theta_rwd = 5 - 2 * np.abs(theta_error) 
+            use_lateral_penalty = True
 
         reward = 0.0
+        # Driving reward   
+        # No matter how many wp is    
+        reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
+
+        # Speed reward
         max_spd = 10
-        reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor *  longitude_factor * positive_road 
-        reward += self.config["speed_reward"] * (vehicle.last_spd / max_spd) * positive_road * 0.1 * float(self.config["seq_traj_len"])
-        if vehicle.last_spd<4:
-            reward -= 0.04
-        reward += heading_factor * ( 0 - np.abs(theta_error))
-        # if np.abs(long_now- long_last) < 0.0001:
-        #     reward -= 0.02
-        
-        
+        speed_list = self.compute_speed_list(vehicle)
+        for speed in speed_list: 
+            reward += self.config["speed_reward"] * (speed / max_spd) * positive_road     
+            if speed < 4:
+                reward -= 0.04
+
+        # Heading Reward
+        heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
+        for heading_error in heading_error_list:
+            reward += self.config["heading_reward"] * (0 - np.abs(heading_error))    
+
         if self.config["use_jerk_penalty"]:
-            jerk_value = self.compute_jerk_penalty(vehicle)
-            reward += (0.03 *float(self.config["seq_traj_len"]) -jerk_value / 200.0) 
-        if self.config["use_lateral_penalty"]:
-            lateral_penalty = self.compute_lateral_penalty(vehicle, current_lane)
-            reward -= lateral_penalty /4.0 * 0.3
+            jerk_list = self.compute_jerk_list(vehicle)
+            for jerk in jerk_list:
+                if not self.config["half_jerk"]:
+                    reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
+                else:
+                    reward += (0.03 - 0.3 * np.tanh(jerk / 100.0))
+        if use_lateral_penalty:
+            lateral_penalty = avg_lateral_cum
+            reward -= lateral_penalty /4 * 0.3
         step_info["step_reward"] = reward
 
 
@@ -398,7 +415,7 @@ class MetaDriveControlEnv(BaseEnv):
             reward = - self.config["run_out_of_time_penalty"]
         return reward, step_info
 
-    def compute_jerk_penalty(self, vehicle):
+    def compute_jerk_list(self, vehicle):
         jerk_list = []
         #vehicle = self.vehicles[vehicle_id]
         v_t0 = vehicle.penultimate_state['speed']
@@ -422,18 +439,41 @@ class MetaDriveControlEnv(BaseEnv):
             point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
             point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
             jerk_list.append(np.array([point_jerk_x, point_jerk_y]))
-        final_jerk_value = 0
+        #final_jerk_value = 0
+        step_jerk_list = []
         for jerk in jerk_list:
-            final_jerk_value += np.linalg.norm(jerk)
-        return final_jerk_value
+            #final_jerk_value += np.linalg.norm(jerk)
+            step_jerk_list.append(np.linalg.norm(jerk))
+        return step_jerk_list
 
-    def compute_lateral_penalty(self, vehicle, lane):
-        final_lateral_value = 0
-        for i in range(1, self.config['seq_traj_len'] +1):
+    def compute_heading_error_list(self, vehicle, lane):
+        heading_error_list = []
+        for i in range(1, self.config['seq_traj_len'] + 1):
+            theta = vehicle.traj_wp_list[i]['yaw'] 
             long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
-            final_lateral_value += np.abs(lateral_now)
-        final_lateral_value /= float(self.config['seq_traj_len'])
-        return final_lateral_value
+            road_heading_theta = lane.heading_theta_at(long_now)
+            theta_error = self.wrap_angle(theta - road_heading_theta)
+            heading_error_list.append(np.abs(theta_error))
+        return heading_error_list
+
+    def compute_speed_list(self, vehicle):
+        speed_list = []
+        for i in range(1, self.config['seq_traj_len'] + 1):
+            speed = vehicle.traj_wp_list[i]['speed']
+            speed_list.append(speed)
+        return speed_list
+
+    def compute_avg_lateral_cum(self, vehicle, lane):
+        # Compute lateral distance for each wp
+        # average the factor by seq traj len
+        # For example, if traj len is 10, then i = 1, 2, ... 10
+        lateral_cum = 0
+        for i in range(1, self.config['seq_traj_len'] + 1):
+            long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
+            lateral_cum += np.abs(lateral_now)
+        avg_lateral_cum = lateral_cum / float(self.config['seq_traj_len'])
+        return avg_lateral_cum
+        
             
 
 

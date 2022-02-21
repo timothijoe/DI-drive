@@ -296,3 +296,58 @@ class WpDecoder(nn.Module):
     
     def forward(self, z, init_state):
         return self.decode(z, init_state)
+
+class CCDecoder(nn.Module):
+    def __init__(self,
+        control_num = 2,
+        seq_len = 30,
+        use_relative_pos = True,
+        dt = 0.03,
+        ):
+        super(CCDecoder, self).__init__()
+        self.control_num = control_num
+        self.seq_len = seq_len 
+        self.use_relative_pos = use_relative_pos
+        self.dt = dt
+
+    def plant_model_batch(self, prev_state_batch, pedal_batch, steering_batch, dt = 0.03):
+        #import copy
+        prev_state = prev_state_batch
+        x_t = prev_state[:,0]
+        y_t = prev_state[:,1]
+        psi_t = prev_state[:,2]
+        v_t = prev_state[:,3]
+        steering_batch = steering_batch * 2
+        #pedal_batch = torch.clamp(pedal_batch, -5, 5)
+        steering_batch = torch.clamp(steering_batch, -0.5, 0.5)
+        beta = steering_batch
+        a_t = pedal_batch * 4
+        v_t_1 = v_t + a_t * dt 
+        v_t_1 = torch.clamp(v_t_1, 0, 10)
+        psi_dot = v_t * torch.tan(beta) / 2.5
+        psi_t_1 = psi_dot*dt + psi_t 
+        x_dot = v_t_1 * torch.cos(psi_t_1)
+        y_dot = v_t_1 * torch.sin(psi_t_1)
+        x_t_1 = x_dot * dt + x_t 
+        y_t_1 = y_dot * dt + y_t
+        
+        #psi_t = self.wrap_angle_rad(psi_t)
+        current_state = torch.stack([x_t_1, y_t_1, psi_t_1, v_t_1], dim = 1)
+        #current_state = torch.FloatTensor([x_t, y_t, psi_t, v_t_1])
+        return current_state
+
+    def decode(self, z, init_state):
+        generated_traj = []
+        prev_state = init_state 
+        assert z.shape[1] == 2
+        for i in range(self.seq_len):
+            pedal_batch = z[:, 2*i]
+            steer_batch = z[:, 2*i +1]
+            curr_state = self.plant_model_batch(prev_state, pedal_batch, steer_batch, self.dt)
+            generated_traj.append(curr_state)
+            prev_state = curr_state 
+        generated_traj = torch.stack(generated_traj, dim = 1)
+        return generated_traj
+    
+    def forward(self, z, init_state):
+        return self.decode(z, init_state)
