@@ -21,7 +21,7 @@ metadrive_basic_config = dict(
             use_lateral_penalty = False,
             traffic_density = 0.3,
             seq_traj_len = 1,
-            map ='SOSO',
+            map ='OSOS',
             ),
         manager=dict(
             shared_memory=False,
@@ -94,7 +94,8 @@ def main(cfg):
 
 
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/cluster61/exp1_sac_round/iteration_10000.pth.tar', map_location = 'cpu'))
+    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb21/cluster61/exp1_sac_round_half_jerk/iteration_5000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb21/cluster61/exp1_sac_round_full_jerk/iteration_5000.pth.tar', map_location = 'cpu'))
 
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))

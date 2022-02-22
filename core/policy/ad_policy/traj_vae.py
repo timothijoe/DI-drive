@@ -262,7 +262,7 @@ class WpDecoder(nn.Module):
         y_t = prev_state[:,1]
         psi_t = prev_state[:,2]
         v_t = prev_state[:,3]
-        steering_batch = steering_batch * 2
+        steering_batch = steering_batch * 0.4
         #pedal_batch = torch.clamp(pedal_batch, -5, 5)
         steering_batch = torch.clamp(steering_batch, -0.5, 0.5)
         beta = steering_batch
@@ -317,7 +317,7 @@ class CCDecoder(nn.Module):
         y_t = prev_state[:,1]
         psi_t = prev_state[:,2]
         v_t = prev_state[:,3]
-        steering_batch = steering_batch * 2
+        steering_batch = steering_batch * 0.4
         #pedal_batch = torch.clamp(pedal_batch, -5, 5)
         steering_batch = torch.clamp(steering_batch, -0.5, 0.5)
         beta = steering_batch
@@ -341,8 +341,8 @@ class CCDecoder(nn.Module):
         prev_state = init_state 
         assert z.shape[1] == 2
         for i in range(self.seq_len):
-            pedal_batch = z[:, 2*i]
-            steer_batch = z[:, 2*i +1]
+            pedal_batch = z[:, 0]
+            steer_batch = z[:, 1]
             curr_state = self.plant_model_batch(prev_state, pedal_batch, steer_batch, self.dt)
             generated_traj.append(curr_state)
             prev_state = curr_state 

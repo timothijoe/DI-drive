@@ -109,7 +109,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     use_jerk_penalty = False,
     use_lateral_penalty = False,
-    const_control = True,
+    const_control = False,
     half_jerk = False,
 
 
@@ -131,6 +131,8 @@ class MetaDriveControlEnv(BaseEnv):
         merged_config = self._merge_extra_config(config)
         global_config = self._post_process_config(merged_config)
         self.config = global_config
+        if self.config["seq_traj_len"] == 1:
+            self.config["episode_max_step"] = self.config["episode_max_step"] * 10
 
         # agent check
         self.num_agents = self.config["num_agents"]
