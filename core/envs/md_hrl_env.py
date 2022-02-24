@@ -29,6 +29,7 @@ from metadrive.obs.top_down_obs_multi_channel import TopDownMultiChannel
 from metadrive.utils.utils import auto_termination
 from core.policy.ad_policy.traj_vae import VaeDecoder
 import torch
+from metadrive.component.road_network import Road
 
 DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
@@ -311,6 +312,7 @@ class MetaDriveHRLEnv(BaseEnv):
             done_info[TerminationState.CRASH_VEHICLE] or done_info[TerminationState.CRASH_OBJECT]
             or done_info[TerminationState.CRASH_BUILDING]
         )
+        done_info['complete_ratio'] = clip(self.already_go_dist/ self.navi_distance + 0.05, 0.0, 1.0)
 
         return done, done_info
 
@@ -347,6 +349,11 @@ class MetaDriveHRLEnv(BaseEnv):
         
         step_info = dict()
 
+        if self._compute_navi_dist:
+            self.navi_distance = self.get_navigation_len(vehicle)
+            #print('zt dist: {}'.format(dist))
+            self._compute_navi_dist = False
+
         # Reward for moving forward in current lane
         if vehicle.lane in vehicle.navigation.current_ref_lanes:
             current_lane = vehicle.lane
@@ -357,6 +364,10 @@ class MetaDriveHRLEnv(BaseEnv):
             positive_road = 1 if not current_road.is_negative_road() else -1
         long_last, _ = current_lane.local_coordinates(vehicle.last_macro_position)
         long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
+        self.already_go_dist += (long_now - long_last)
+        #print('already_go_dist: {}'.format(self.already_go_dist))
+
+
 
         avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
         use_lateral_penalty = False
@@ -411,7 +422,22 @@ class MetaDriveHRLEnv(BaseEnv):
         elif self.step_num >= self.config["episode_max_step"]:
             reward = - self.config["run_out_of_time_penalty"]
         return reward, step_info
-
+    
+    def get_navigation_len(self, vehicle):
+        checkpoints = vehicle.navigation.checkpoints
+        road_network = vehicle.navigation.map.road_network
+        total_dist = 0
+        assert len(checkpoints) >=2
+        for check_num in range(0, len(checkpoints)-1):
+            front_node = checkpoints[check_num]
+            end_node = checkpoints[check_num+1] 
+            cur_lanes = road_network.graph[front_node][end_node]
+            target_lane_num = int(len(cur_lanes) / 2)
+            target_lane = cur_lanes[target_lane_num]
+            target_lane_length = target_lane.length
+            total_dist += target_lane_length 
+        return total_dist
+            
     def compute_jerk_list(self, vehicle):
         jerk_list = []
         #vehicle = self.vehicles[vehicle_id]
@@ -757,6 +783,7 @@ class MetaDriveHRLEnv(BaseEnv):
             o_dict['speed'] = v.last_spd
             #obses[v_id] =  o_dict #o
             self.vel_speed = 0
+            
 
             if hasattr(v, 'macro_succ'):
                 v.macro_succ = False
@@ -770,6 +797,16 @@ class MetaDriveHRLEnv(BaseEnv):
             v.traj_wp_list.append(copy.deepcopy(v.penultimate_state))
             v.traj_wp_list.append(copy.deepcopy(v.penultimate_state))
             v.last_spd = 0
+
+            # dist = self.get_navigation_len(v)
+            # print('dist: {}'.format(dist))
+
+        self.already_go_dist = 0
+        self._compute_navi_dist = True 
+        self.navi_distance = 100.0
+        
+
+
         # zt_obs = zt_obs.transpose((2,0,1))
         # print('process: {}  --- > initializing: a new episode begins'.format(os.getpid()))
         self.remove_init_stop = True

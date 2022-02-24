@@ -55,6 +55,7 @@ class DriveEnvWrapper(gym.Wrapper):
             birdview = obs['birdview'].transpose((2,0,1))
             obs = {'speed': speed, 'birdview': birdview}
         self._final_eval_reward = 0.0
+        self._arrive_dest = False
         return obs
 
     def step(self, action: Any = None) -> BaseEnvTimestep:
@@ -84,6 +85,8 @@ class DriveEnvWrapper(gym.Wrapper):
         rew = to_ndarray([rew], dtype=np.float32)
         if done:
             info['final_eval_reward'] = self._final_eval_reward
+            info['complete_ratio'] = info['complete_ratio']
+
         return BaseEnvTimestep(obs, rew, done, info)
 
     def seed(self, seed: int, dynamic_seed: bool = True) -> None:

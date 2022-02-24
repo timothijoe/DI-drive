@@ -17,13 +17,13 @@ metadrive_basic_config = dict(
     env=dict(
         metadrive=dict(
             use_render=True,
-            show_seq_traj = False,
-            traffic_density = 0.3,
+            show_seq_traj = True,
+            traffic_density = 0.2,
             seq_traj_len = 10,
             use_jerk_penalty = True,
-            map = 'OSOS',
-            #map='SOSO', 
-            #map='SXSX',
+            #map = 'OSOS',
+            map='SOSO', 
+            #map='XSXS',
             ),
         manager=dict(
             shared_memory=False,
@@ -97,7 +97,9 @@ def main(cfg):
     import torch
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/cluster62/sac_traj_len_10/iteration_10000.pth.tar', map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iteration_ckpt/feb21/cluster62/sac_len_10/iteration_10000.pth.tar', map_location = 'cpu'))
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb21/cluster61/lateral_round/iteration_5000.pth.tar', map_location = 'cpu'))
+    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb22/cluster61/z1_exp3_sac_inter/iteration_10000.pth.tar', map_location = 'cpu'))
+    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb24/cluster61/z1_exp3_sac_inter/iteration_20000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb24/cluster61/z1_exp3_sac_roundabout/iteration_10000.pth.tar', map_location = 'cpu'))
 
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))

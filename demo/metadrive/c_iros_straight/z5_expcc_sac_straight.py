@@ -11,9 +11,9 @@ from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseL
 from core.envs import DriveEnvWrapper
 from core.policy.ad_policy.conv_qac import ConvQAC
 from core.envs.md_control_env import MetaDriveControlEnv
-
+from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 metadrive_basic_config = dict(
-    exp_name = 'z5_exp2_sac_const_control',
+    exp_name = 'cz5_exp2_sac_const_control',
     env=dict(
         metadrive=dict(
             use_render=False,
@@ -99,7 +99,7 @@ def main(cfg):
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
     collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
-    evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
+    evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
 
     learner.call_hook('before_run')

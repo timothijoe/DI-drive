@@ -11,6 +11,7 @@ from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseL
 from core.envs import DriveEnvWrapper
 from core.policy.ad_policy.conv_vac import ConvVAC
 from core.envs.md_control_env import MetaDriveControlEnv
+from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 metadrive_basic_config = dict(
     exp_name='z4_exp1_ppo_inter',
@@ -33,7 +34,7 @@ metadrive_basic_config = dict(
         ),
         n_evaluator_episode=1,
         stop_value=99999,
-        collector_env_num=1,
+        collector_env_num=10,
         evaluator_env_num=1,
     ),
     policy=dict(
@@ -96,7 +97,7 @@ def main(cfg):
     collector = SampleSerialCollector(
         cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name
     )
-    evaluator = InteractionSerialEvaluator(
+    evaluator = MetadriveEvaluator(
         cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name
     )
 
