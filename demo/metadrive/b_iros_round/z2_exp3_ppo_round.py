@@ -11,7 +11,7 @@ from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseL
 from core.envs import DriveEnvWrapper
 from core.policy.ad_policy.conv_vac import ConvVAC
 from core.envs.md_hrl_env import MetaDriveHRLEnv
-
+from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 metadrive_basic_config = dict(
     exp_name='z2_exp3_ppo_round',
     env=dict(
