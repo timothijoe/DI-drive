@@ -236,6 +236,7 @@ class ConvQAC(QAC):
         return {'q_value': x}
 
     def generate_traj_from_lat(self, latent_action, init_state):
-        traj = self._traj_decoder(latent_action, init_state)
-        traj = torch.cat([init_state.unsqueeze(1), traj], dim = 1)
-        return traj[:, :,:2]
+        with torch.no_grad():
+            traj = self._traj_decoder(latent_action, init_state)
+            traj = torch.cat([init_state.unsqueeze(1), traj], dim = 1)
+            return traj[:, :,:2]
