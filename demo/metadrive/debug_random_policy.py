@@ -84,11 +84,7 @@ metadrive_rush_config = dict(
             learning_rate=3e-4,
             auto_alpha = False,
             alpha = 0.5,
-            learner = dict(
-                hook = dict(
-                    save_ckpt_after_iter = 100,
-                )
-            )
+            learner = dict(hook = dict(save_ckpt_after_iter = 100,))
         ),
         collect=dict(
             n_sample=100,

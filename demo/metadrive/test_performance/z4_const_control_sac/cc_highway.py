@@ -17,27 +17,26 @@ metadrive_basic_config = dict(
     exp_name = 'sac_only_jerk',
     env=dict(
         metadrive=dict(
-            use_render=True,
-            show_seq_traj = True,
+            use_render=False,
             use_jerk_penalty = True,
             use_lateral_penalty = False,
-            traffic_density = 0.3,
+            traffic_density = 0.2,
             #seq_traj_len = 1,
             seq_traj_len = 10,
             show_interface=False,
             const_control = True,
             #map ='XSXS',
-            #map ='OSOS',
+            map ='OSOS',
             ),
         manager=dict(
             shared_memory=False,
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=1,
+        n_evaluator_episode=50,
         stop_value=99999,
         collector_env_num=1,
-        evaluator_env_num=1,
+        evaluator_env_num=5,
     ),
     policy=dict(
         cuda=True,
@@ -98,20 +97,18 @@ def main(cfg):
     model = ConvQAC(**cfg.policy.model)
     policy = SACPolicy(cfg.policy, model=model)
 
-
+    import os
+    pwd = os.getcwd()
+    file_path = pwd + 'iros_result/feb24/cluster61/z3_exp1_sac_round/iteration_5000.pth.tar'
     import torch
+    # policy._load_state_dict_collect(torch.load(file_path, map_location = 'cpu'))
     
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb24/cluster61/z5_expcc_sac_inter/iteration_20000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb24/cluster62/z5_expcc_sac_straight/iteration_20000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb24/cluster61/z5_expcc_sac_round/iteration_10000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/test_compare/z5_expcc_inter/iteration_30000.pth.tar', map_location = 'cpu'))
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/tiger_dongbei/sac_cc/straight/iteration_50000.pth.tar', map_location = 'cpu'))
-
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     #learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
-    evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
-    for iter in range(5):
+    evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
+    for iter in range(1):
         stop, reward = evaluator.eval()
+    print('zt end')
     evaluator.close()
 
 

@@ -12,7 +12,38 @@ from core.utils.others.config_helper import deep_merge_dicts
 from ding.envs.env.base_env import BaseEnvTimestep, BaseEnvInfo
 from ding.envs.common.env_element import EnvElementInfo
 from ding.torch_utils.data_helper import to_ndarray
+import matplotlib.pyplot as plt
 
+def draw_multi_channels_top_down_observation(obs, show_time=4):
+    num_channels = obs.shape[-1]
+    assert num_channels == 5
+    channel_names = [
+        "Road and navigation", "Ego now and previous pos", "Neighbor at step t", "Neighbor at step t-1",
+        "Neighbor at step t-2"
+    ]
+    fig, axs = plt.subplots(1, num_channels, figsize=(15, 4), dpi=80)
+    count = 0
+
+    def close_event():
+        plt.close()  # timer calls this function after 3 seconds and closes the window
+
+    timer = fig.canvas.new_timer(
+        interval=show_time * 1000
+    )  # creating a timer object and setting an interval of 3000 milliseconds
+    timer.add_callback(close_event)
+
+    for i, name in enumerate(channel_names):
+        count += 1
+        ax = axs[i]
+        ax.imshow(obs[..., i], cmap="bone")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(name)
+        # print("Drawing {}-th semantic map!".format(count))
+    fig.suptitle("Multi-channels Top-down Observation")
+    timer.start()
+    plt.show()
+    #plt.close()
 
 class DriveEnvWrapper(gym.Wrapper):
     """
@@ -51,9 +82,9 @@ class DriveEnvWrapper(gym.Wrapper):
         if isinstance(obs, np.ndarray) and len(obs.shape) == 3:
             obs = obs.transpose((2, 0, 1))
         elif isinstance(obs, dict):
-            speed = obs['speed']
+            vehicle_state = obs['vehicle_state']
             birdview = obs['birdview'].transpose((2,0,1))
-            obs = {'speed': speed, 'birdview': birdview}
+            obs = {'vehicle_state': vehicle_state, 'birdview': birdview}
         self._final_eval_reward = 0.0
         self._arrive_dest = False
         return obs
@@ -74,14 +105,15 @@ class DriveEnvWrapper(gym.Wrapper):
         action = to_ndarray(action)
 
         obs, rew, done, info = self.env.step(action)
+        #draw_multi_channels_top_down_observation(obs, show_time=16)
         self._final_eval_reward += rew
         obs = to_ndarray(obs, dtype=np.float32)
         if isinstance(obs, np.ndarray) and len(obs.shape) == 3:
             obs = obs.transpose((2, 0, 1))
         elif isinstance(obs, dict):
-            speed = obs['speed']
+            vehicle_state = obs['vehicle_state']
             birdview = obs['birdview'].transpose((2,0,1))
-            obs = {'speed': speed, 'birdview': birdview}
+            obs = {'vehicle_state': vehicle_state, 'birdview': birdview}
         rew = to_ndarray([rew], dtype=np.float32)
         if done:
             info['final_eval_reward'] = self._final_eval_reward

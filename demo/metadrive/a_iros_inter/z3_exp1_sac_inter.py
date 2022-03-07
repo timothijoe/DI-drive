@@ -31,10 +31,10 @@ metadrive_basic_config = dict(
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=6,
+        n_evaluator_episode=12,
         stop_value=99999,
         collector_env_num=10,
-        evaluator_env_num=3,
+        evaluator_env_num=4,
     ),
     policy=dict(
         cuda=True,
