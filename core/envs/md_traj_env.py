@@ -82,11 +82,11 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # ===== Reward Scheme =====
     # See: https://github.com/decisionforce/metadrive/issues/283
-    success_reward=10.0,
-    out_of_road_penalty=5.0,
-    crash_vehicle_penalty=1.0,
-    crash_object_penalty=5.0,
-    run_out_of_time_penalty = 5.0,
+    success_reward= 1.0, #10.0,
+    out_of_road_penalty= 0.0, #5.0,
+    crash_vehicle_penalty=0.0, #1.0,
+    crash_object_penalty=0.0, #5.0,
+    run_out_of_time_penalty = 0.0, #5.0,
     driving_reward=0.2,
     speed_reward=0.05,
     heading_reward = 0.15, 
@@ -188,6 +188,7 @@ class MetaDriveTrajEnv(BaseEnv):
         #     vae_load_dir = 'ckpt_files/seq_len_20_79_decoder_ckpt'
         # self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
         self.vel_speed = 0.0
+        self.z_state = np.zeros(6)
 
     # define a action type, and execution style
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
@@ -362,6 +363,7 @@ class MetaDriveTrajEnv(BaseEnv):
             self.navi_distance = self.get_navigation_len(vehicle)
             #print('zt dist: {}'.format(dist))
             self._compute_navi_dist = False
+        self.update_current_state(vehicle)
 
         # Reward for moving forward in current lane
         if vehicle.lane in vehicle.navigation.current_ref_lanes:
@@ -378,41 +380,42 @@ class MetaDriveTrajEnv(BaseEnv):
 
 
 
-        avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
-        use_lateral_penalty = False
+        #avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
+        #use_lateral_penalty = False
         # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
-        if self.config["use_lateral"]:
-            lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
-            #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
-        else:
-            lateral_factor = 1.0
-            use_lateral_penalty = True
+        # if self.config["use_lateral"]:
+        #     lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+        #     #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+        # else:
+        #     lateral_factor = 1.0
+        #     use_lateral_penalty = True
 
         reward = 0.0
+        lateral_factor = 1.0 / self.navi_distance
         # Driving reward   
         # No matter how many wp is    
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
 
-        # Speed reward
-        max_spd = 10
-        speed_list = self.compute_speed_list(vehicle)
-        for speed in speed_list: 
-            reward += self.config["speed_reward"] * (speed / max_spd) * positive_road     
-            if speed < 4:
-                reward -= 0.04
+        # # Speed reward
+        # max_spd = 10
+        # speed_list = self.compute_speed_list(vehicle)
+        # for speed in speed_list: 
+        #     reward += self.config["speed_reward"] * (speed / max_spd) * positive_road     
+        #     if speed < 4:
+        #         reward -= 0.04
 
-        # Heading Reward
-        heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
-        for heading_error in heading_error_list:
-            reward += self.config["heading_reward"] * (0 - np.abs(heading_error))    
+        # # Heading Reward
+        # heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
+        # for heading_error in heading_error_list:
+        #     reward += self.config["heading_reward"] * (0 - np.abs(heading_error))    
 
-        if self.config["use_jerk_penalty"]:
-            jerk_list = self.compute_jerk_list(vehicle)
-            for jerk in jerk_list:
-                reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
-        if use_lateral_penalty:
-            lateral_penalty = avg_lateral_cum
-            reward -= lateral_penalty /4 * 0.5
+        # if self.config["use_jerk_penalty"]:
+        #     jerk_list = self.compute_jerk_list(vehicle)
+        #     for jerk in jerk_list:
+        #         reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
+        # if use_lateral_penalty:
+        #     lateral_penalty = avg_lateral_cum
+        #     reward -= lateral_penalty /4 * 0.5
         step_info["step_reward"] = reward
 
 
@@ -477,6 +480,22 @@ class MetaDriveTrajEnv(BaseEnv):
             #final_jerk_value += np.linalg.norm(jerk)
             step_jerk_list.append(np.linalg.norm(jerk))
         return step_jerk_list
+
+
+    def update_current_state(self, vehicle):
+        t_inverse = 1.0 / self.config['physics_world_step_size']
+        theta_t1 = vehicle.traj_wp_list[-2]['yaw']
+        theta_t2 = vehicle.traj_wp_list[-1]['yaw']
+        v_t1 = vehicle.traj_wp_list[-2]['speed']
+        v_t2 = vehicle.traj_wp_list[-1]['speed']
+        v_state = np.zeros(6)
+        v_state[3] = v_t2
+        v_state[4] = (v_t2 - v_t1) * t_inverse 
+        theta_dot = (theta_t2 - theta_t1) * t_inverse
+        v_state[5] = np.arctan(2.5 * theta_dot / v_t2) if v_t2 > 0.001 else 0.0
+        self.z_state = v_state
+
+
 
     def compute_heading_error_list(self, vehicle, lane):
         heading_error_list = []
@@ -543,8 +562,9 @@ class MetaDriveTrajEnv(BaseEnv):
             if self.config["traj_control_mode"] == 'acc':
                 o_dict = {}
                 o_dict['birdview'] = o 
-                v_state = np.zeros(4)
-                v_state[3] = v.last_spd
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             else:
@@ -672,8 +692,9 @@ class MetaDriveTrajEnv(BaseEnv):
             if self.config["traj_control_mode"] == 'acc':
                 o_dict = {}
                 o_dict['birdview'] = o 
-                v_state = np.zeros(4)
-                v_state[3] = v.last_spd
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             else:

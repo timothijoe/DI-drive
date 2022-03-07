@@ -14,6 +14,11 @@ from core.envs.md_traj_env import MetaDriveTrajEnv
 from core.policy.hrl_policy.traj_qac import ConvQAC 
 from core.policy.hrl_policy.traj_sac import TrajSAC
 from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
+import os 
+
+
+pwd = os.getcwd()
+VAE_LOAD_DIR = pwd + '/ckpt_files/jerk_ckpt'
 
 metadrive_basic_config = dict(
     exp_name = 'metadrive_basic_sac',
@@ -43,7 +48,7 @@ metadrive_basic_config = dict(
             obs_shape=[5, 200, 200],
             action_shape=2,
             encoder_hidden_size_list=[128, 128, 64],
-            vae_load_dir='/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_10_decoder_ckpt'
+            vae_load_dir=VAE_LOAD_DIR,
         ),
         learn=dict(
             update_per_collect=100,
