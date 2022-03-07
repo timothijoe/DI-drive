@@ -27,9 +27,105 @@ from metadrive.utils import Config, merge_dicts, get_np_random, concat_step_info
 from metadrive.envs.base_env import BASE_DEFAULT_CONFIG
 from metadrive.obs.top_down_obs_multi_channel import TopDownMultiChannel
 from metadrive.utils.utils import auto_termination
-from core.policy.ad_policy.traj_vae import VaeDecoder
+#from core.policy.ad_policy.traj_vae import VaeDecoder
 import torch
 from metadrive.component.road_network import Road
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+from torch.distributions import Normal, Independent
+
+
+
+
+class VaeDecoder(nn.Module):
+    def __init__(self,
+        embedding_dim = 64,
+        h_dim = 64,
+        latent_dim = 100,
+        seq_len = 30,
+        use_relative_pos = True,
+        dt = 0.03,
+        ):
+        super(VaeDecoder, self).__init__()
+        self.embedding_dim = embedding_dim
+        self.h_dim = h_dim 
+        self.num_layers = 1
+        self.latent_dim = latent_dim
+        self.seq_len = seq_len 
+        self.use_relative_pos = use_relative_pos
+        self.dt = dt
+        # input: x, y, theta, v,   output: embedding
+        self.spatial_embedding = nn.Linear(4, self.embedding_dim)
+        # input: h_dim, output: throttle, steer
+        self.hidden2control = nn.Linear(self.h_dim, 2)
+        self.decoder = nn.LSTM(self.embedding_dim, self.h_dim, self.num_layers)
+        self.init_hidden_decoder = torch.nn.Linear(in_features = self.latent_dim, out_features = self.h_dim * self.num_layers)
+
+    def plant_model_batch(self, prev_state_batch, pedal_batch, steering_batch, dt = 0.03):
+        #import copy
+        prev_state = prev_state_batch
+        x_t = prev_state[:,0]
+        y_t = prev_state[:,1]
+        psi_t = prev_state[:,2]
+        v_t = prev_state[:,3]
+        #pedal_batch = torch.clamp(pedal_batch, -5, 5)
+        steering_batch = torch.clamp(steering_batch, -0.5, 0.5)
+        beta = steering_batch
+        a_t = pedal_batch
+        v_t_1 = v_t + a_t * dt 
+        v_t_1 = torch.clamp(v_t_1, 0, 10)
+        psi_dot = v_t * torch.tan(beta) / 2.5
+        psi_dot = torch.clamp(psi_dot, -3.14 /2,3.14 /2)
+        psi_t_1 = psi_dot*dt + psi_t 
+        x_dot = v_t_1 * torch.cos(psi_t_1)
+        y_dot = v_t_1 * torch.sin(psi_t_1)
+        x_t_1 = x_dot * dt + x_t 
+        y_t_1 = y_dot * dt + y_t
+        
+        #psi_t = self.wrap_angle_rad(psi_t)
+        current_state = torch.stack([x_t_1, y_t_1, psi_t_1, v_t_1], dim = 1)
+        #current_state = torch.FloatTensor([x_t, y_t, psi_t, v_t_1])
+        #print(current_state)
+        return current_state
+
+    def decode(self, z, init_state):
+        generated_traj = []
+        prev_state = init_state 
+        # decoder_input shape: batch_size x 4
+        decoder_input = self.spatial_embedding(prev_state)
+        decoder_input = decoder_input.view(1, -1 , self.embedding_dim)
+        decoder_h = self.init_hidden_decoder(z)
+        if len(decoder_h.shape) == 2:
+            decoder_h = torch.unsqueeze(decoder_h, 0)
+            #decoder_h.unsqueeze(0)
+        decoder_h = (decoder_h, decoder_h)
+        for _ in range(self.seq_len):
+            #print(self.seq_len)
+            # output shape: 1 x batch x h_dim
+            output, decoder_h = self.decoder(decoder_input, decoder_h)
+            control = self.hidden2control(output.view(-1, self.h_dim))
+            curr_state = self.plant_model_batch(prev_state, control[:,0], control[:,1], self.dt)
+            generated_traj.append(curr_state)
+            decoder_input = self.spatial_embedding(curr_state)
+            decoder_input = decoder_input.view(1, -1, self.embedding_dim)
+            prev_state = curr_state 
+        generated_traj = torch.stack(generated_traj, dim = 1)
+        return generated_traj
+    
+    def forward(self, z, init_state):
+        return self.decode(z, init_state)
+
+
+
+
+
+
+
+
+
 
 DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
@@ -114,7 +210,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 )
 
 
-class MetaDriveHRLEnv(BaseEnv):
+class MetaDriveOnestepEnv(BaseEnv):
 
     @classmethod
     def default_config(cls) -> "Config":
@@ -129,11 +225,8 @@ class MetaDriveHRLEnv(BaseEnv):
         merged_config = self._merge_extra_config(config)
         global_config = self._post_process_config(merged_config)
         self.config = global_config
-
         if self.config["seq_traj_len"] == 1:
             self.config["episode_max_step"] = self.config["episode_max_step"] * 10
-        if self.config["seq_traj_len"] == 20:
-            self.config["episode_max_step"] = self.config["episode_max_step"] // 2
 
         # agent check
         self.num_agents = self.config["num_agents"]
@@ -180,10 +273,11 @@ class MetaDriveHRLEnv(BaseEnv):
         elif self.config['seq_traj_len'] == 15:
             vae_load_dir = 'ckpt_files/seq_len_15_78_decoder_ckpt'
         else:
-            assert self.config['seq_traj_len'] == 20
-            vae_load_dir = 'ckpt_files/seq_len_20_79_decoder_ckpt'
+            assert self.config['seq_traj_len'] == 1
+            vae_load_dir = 'ckpt_files/seq_len_1_79_decoder_ckpt'
         self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
         self.vel_speed = 0.0
+        
 
     # define a action type, and execution style
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
@@ -238,7 +332,7 @@ class MetaDriveHRLEnv(BaseEnv):
         return config
 
     def _post_process_config(self, config):
-        config = super(MetaDriveHRLEnv, self)._post_process_config(config)
+        config = super(MetaDriveOnestepEnv, self)._post_process_config(config)
         if not config["rgb_clip"]:
             logging.warning(
                 "You have set rgb_clip = False, which means the observation will be uint8 values in [0, 255]. "
@@ -691,7 +785,7 @@ class MetaDriveHRLEnv(BaseEnv):
             return obses, rewards, dones, step_infos
 
     def setup_engine(self):
-        super(MetaDriveHRLEnv, self).setup_engine()
+        super(MetaDriveOnestepEnv, self).setup_engine()
         self.engine.accept("b", self.switch_to_top_down_view)
         self.engine.accept("q", self.switch_to_third_person_view)
         from core.utils.simulator_utils.md_utils.traffic_manager_utils import MacroTrafficManager
@@ -874,6 +968,6 @@ class MetaDriveHRLEnv(BaseEnv):
 
 
 register(
-    id='HRL-v1',
-    entry_point='core.envs.md_macro_env:MetaDriveHRLEnv',
+    id='One-point-v1',
+    entry_point='core.envs.md_1step_env:MetaDriveOnestepEnv',
 )

@@ -31,10 +31,10 @@ metadrive_basic_config = dict(
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=1,
+        n_evaluator_episode=12,
         stop_value=99999,
         collector_env_num=10,
-        evaluator_env_num=1,
+        evaluator_env_num=4,
     ),
     policy=dict(
         cuda=True,
@@ -96,7 +96,7 @@ def main(cfg):
     collector = SampleSerialCollector(
         cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name
     )
-    evaluator = InteractionSerialEvaluator(
+    evaluator = MetadriveEvaluator(
         cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name
     )
 

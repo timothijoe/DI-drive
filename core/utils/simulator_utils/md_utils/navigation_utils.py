@@ -30,6 +30,7 @@ class HRLNodeNavigation(NodeNetworkNavigation):
         #self.drawd = False
         
         self.LINE_TO_DEST_HEIGHT += 4
+        self.activate_car_pos_marker = False
 
     def _init_trajs(self):
         for i in range(self.seq_traj_len):
@@ -37,6 +38,10 @@ class HRLNodeNavigation(NodeNetworkNavigation):
             init_line.setColor(self.navi_mark_color[0], self.navi_mark_color[1], self.navi_mark_color[2], 0.7)
             self.__dict__['traj_{}'.format(i)] = NodePath(init_line.create())
             self.__dict__['traj_{}'.format(i)].reparentTo(self.origin)
+        init_line = LineSegs()
+        init_line.setColor(0.5, 0.5, 0.5, 0.7)
+        self.current_pos_marker = NodePath(init_line.create())
+        self.current_pos_marker.reparentTo(self.origin)
 
     def _draw_trajectories(self, wp_list):
         for i in range(self.seq_traj_len):
@@ -77,6 +82,40 @@ class HRLNodeNavigation(NodeNetworkNavigation):
         for i in range(self.seq_traj_len):
             lines = LineSegs()
             lines.setColor(self.navi_mark_color[0], self.navi_mark_color[1], self.navi_mark_color[2], 0.7)
+            #lines.moveTo(panda_position(wp_list[i][0], self.LINE_TO_DEST_HEIGHT+4))
+            lines.moveTo(panda_position((wp_list[i][0], wp_list[i][1]), self.LINE_TO_DEST_HEIGHT))
+            lines.drawTo(panda_position((wp_list[i+1][0], wp_list[i+1][1]), self.LINE_TO_DEST_HEIGHT))
+            lines.setThickness(2)
+            self.__dict__['traj_{}'.format(i)].removeNode()
+            self.__dict__['traj_{}'.format(i)] = NodePath(lines.create(False))
+            self.__dict__['traj_{}'.format(i)].hide(CamMask.Shadow | CamMask.RgbCam)
+            self.__dict__['traj_{}'.format(i)].reparentTo(self.origin)
+
+    def show_car_pos(self, wp_list, current_time_step):
+        #print(current_time_step)
+        cx = wp_list[current_time_step][0]
+        cy = wp_list[current_time_step][1]
+        ncx = wp_list[current_time_step+1][0]
+        ncy = wp_list[current_time_step+1][1]
+        theta = np.arctan2(ncy-cy, ncx-cx)
+        theta = 0.0
+        lines = LineSegs()
+        lines.setColor(0.9, 0.9, 0.9, 1.0)
+        #lines.moveTo(panda_position(wp_list[i][0], self.LINE_TO_DEST_HEIGHT+4))
+        lines.moveTo(panda_position((cx-0.1*np.sin(theta) , cy + 0.1*np.cos(theta)), self.LINE_TO_DEST_HEIGHT))
+        lines.drawTo(panda_position((cx + 0.1*np.sin(theta), cy - 0.1*np.cos(theta)), self.LINE_TO_DEST_HEIGHT))
+        lines.setThickness(10)
+        self.current_pos_marker.removeNode()
+        self.current_pos_marker = NodePath(lines.create(False))
+        self.current_pos_marker.hide(CamMask.Shadow | CamMask.RgbCam)
+        self.current_pos_marker.reparentTo(self.origin)
+        for i in range(self.seq_traj_len):
+            lines = LineSegs()
+            if current_time_step > i:
+                lines.setColor(1.0, 0.4, 0.0, 0.7)
+            else:
+                lines.setColor(0.0, 0.7, 1.0, 0.7)
+            #lines.setColor(self.navi_mark_color[0], self.navi_mark_color[1], self.navi_mark_color[2], 0.7)
             #lines.moveTo(panda_position(wp_list[i][0], self.LINE_TO_DEST_HEIGHT+4))
             lines.moveTo(panda_position((wp_list[i][0], wp_list[i][1]), self.LINE_TO_DEST_HEIGHT))
             lines.drawTo(panda_position((wp_list[i+1][0], wp_list[i+1][1]), self.LINE_TO_DEST_HEIGHT))
@@ -139,7 +178,13 @@ class HRLNodeNavigation(NodeNetworkNavigation):
             if hasattr(ego_vehicle, 'v_indx') and self._show_traj:
                 #print(ego_vehicle.v_indx)
                 if ego_vehicle.v_indx == 0:
-                    self.draw_car_path(ego_vehicle.v_wps)
+                    #self.draw_car_path(ego_vehicle.v_wps)
+                    self.activate_car_pos_marker = True
+                if self.activate_car_pos_marker:
+                    self.show_car_pos(ego_vehicle.v_wps, ego_vehicle.v_indx)
+
+                if ego_vehicle.v_indx == 4:
+                    print('zt')
 
             # if ego_vehicle.v_indx == 0:
             #     self.draw_car_path(ego_vehicle.v_wps)
