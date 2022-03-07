@@ -8,8 +8,8 @@ from ding.model.template import QAC
 from ding.model.common import RegressionHead, ReparameterizationHead, FCEncoder
 from typing import Tuple, Optional
 from ding.torch_utils import ResBlock, Flatten
-from core.policy.ad_policy.traj_vae import VaeDecoder
-
+#from core.policy.ad_policy.traj_vae import VaeDecoder
+from core.policy.hrl_policy.traj_vae import VaeDecoder
 class ConvEncoder(nn.Module):
     r"""
     Overview:
