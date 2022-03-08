@@ -42,7 +42,7 @@
            python3 -u /mnt/nfs/zhoutong/latern/xad/metadrive/train_k8s/jerk_v1.py
          volumeMounts:
          - name: work-dir
-           mountPath: /mnt/nfs/niuyazhe
+           mountPath: /mnt/nfs/zhoutong
        volumes:
        - name: cache-volume
          emptyDir:
@@ -50,4 +50,4 @@
            sizeLimit: 128Mi
        - name: work-dir
          hostPath:
-           path: /mnt/nfs/niuyazhe
+           path: /mnt/nfs/zhoutong

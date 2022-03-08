@@ -9,30 +9,27 @@ from ding.config import compile_config
 from ding.policy import SACPolicy
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, NaiveReplayBuffer
 from core.envs import DriveEnvWrapper
-#from core.policy.ad_policy.conv_qac import ConvQAC
-from core.envs.md_traj_env import MetaDriveTrajEnv
-from core.policy.hrl_policy.traj_qac import ConvQAC 
-from core.policy.hrl_policy.traj_sac import TrajSAC
+from core.policy.ad_policy.conv_qac import ConvQAC
+#from core.envs.md_control_env import MetaDriveControlEnv
+from core.envs.jerk_control_md_env import JerkControlMdEnd
 from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
-import os 
-
-
-pwd = os.getcwd()
-VAE_LOAD_DIR = pwd + '/ckpt_files/jerk_ckpt'
+#from core.policy.hrl_policy.traj_qac import ConvQAC 
+from core.policy.hrl_policy.control_qac import ControlQAC 
+from core.policy.hrl_policy.traj_sac import TrajSAC
 
 metadrive_basic_config = dict(
-    exp_name = 'metadrive_basic_sac',
+    exp_name = 'az3_exp1_sac_inter',
     env=dict(
-        metadrive=dict(use_render=False,
-            show_seq_traj = False,
+        metadrive=dict(
+            use_render=True,
+            seq_traj_len = 1,
+            #use_jerk_penalty = True,
+            #use_lateral_penalty = False,
             traffic_density = 0.3,
-            seq_traj_len = 10,
-            use_jerk_penalty = True,
-            #map='OSOS', 
-            #map='XSXS',
-            show_interface=False,
-            episode_max_step = 100,
-        ),
+            #half_jerk = False,
+            #map='XSXS', 
+            #use_lateral = True, 
+            ),
         manager=dict(
             shared_memory=False,
             max_retry=2,
@@ -49,7 +46,6 @@ metadrive_basic_config = dict(
             obs_shape=[5, 200, 200],
             action_shape=2,
             encoder_hidden_size_list=[128, 128, 64],
-            vae_load_dir=VAE_LOAD_DIR,
         ),
         learn=dict(
             update_per_collect=100,
@@ -76,7 +72,7 @@ main_config = EasyDict(metadrive_basic_config)
 
 
 def wrapped_env(env_cfg, wrapper_cfg=None):
-    return DriveEnvWrapper(MetaDriveTrajEnv(config=env_cfg), wrapper_cfg)
+    return DriveEnvWrapper(JerkControlMdEnd(config=env_cfg), wrapper_cfg)
 
 
 def main(cfg):
@@ -100,11 +96,8 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    model = ConvQAC(**cfg.policy.model)
+    model = ControlQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
-    #import torch
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/hoffnung/xad/iros_result/feb24/cluster61/z1_exp3_sac_inter/iteration_40000.pth.tar', map_location = 'cpu'))
-    #policy = SACPolicy(cfg.policy, model=model)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
@@ -119,7 +112,7 @@ def main(cfg):
             stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
             if stop:
                 break
-        # Sampling data from environments
+        #Sampling data from environments
         new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
         replay_buffer.push(new_data, cur_collector_envstep=collector.envstep)
         for i in range(cfg.policy.learn.update_per_collect):
