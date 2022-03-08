@@ -9,7 +9,7 @@ from ding.config import compile_config
 from ding.policy import SACPolicy
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, NaiveReplayBuffer
 from core.envs import DriveEnvWrapper
-from core.policy.ad_policy.conv_qac import ConvQAC
+from core.policy.hrl_policy.control_qac import ControlQAC
 from core.envs.md_control_env import MetaDriveControlEnv
 from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
@@ -33,8 +33,8 @@ metadrive_basic_config = dict(
         ),
         n_evaluator_episode=12,
         stop_value=99999,
-        collector_env_num=10,
-        evaluator_env_num=4,
+        collector_env_num=1,
+        evaluator_env_num=1,
     ),
     policy=dict(
         cuda=True,
@@ -92,7 +92,7 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    model = ConvQAC(**cfg.policy.model)
+    model = ControlQAC(**cfg.policy.model)
     policy = SACPolicy(cfg.policy, model=model)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
