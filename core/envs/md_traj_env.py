@@ -110,7 +110,8 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     use_jerk_penalty = False,
     use_lateral_penalty = False,
 
-    traj_control_mode = 'acc', # another type is 'jerk'
+    #traj_control_mode = 'acc', # another type is 'jerk'
+    traj_control_mode = 'jerk',
     # if we choose traj_control_mode = 'acc', then the current state is [0,0,0,v] and the control signal is throttle and steer
     # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
     const_episode_max_step = False ,
@@ -135,10 +136,10 @@ class MetaDriveTrajEnv(BaseEnv):
         global_config = self._post_process_config(merged_config)
         self.config = global_config
 
-        if self.config["seq_traj_len"] == 1:
-            self.config["episode_max_step"] = self.config["episode_max_step"] * 10
-        if self.config["seq_traj_len"] == 20:
-            self.config["episode_max_step"] = self.config["episode_max_step"] // 2
+        # if self.config["seq_traj_len"] == 1:
+        #     self.config["episode_max_step"] = self.config["episode_max_step"] * 10
+        # if self.config["seq_traj_len"] == 20:
+        #     self.config["episode_max_step"] = self.config["episode_max_step"] // 2
 
         # agent check
         self.num_agents = self.config["num_agents"]
@@ -365,7 +366,7 @@ class MetaDriveTrajEnv(BaseEnv):
             if not self.config['const_episode_max_step']:
                 self.episode_max_step = self.get_episode_max_step(self.navi_distance)
             self._compute_navi_dist = False
-        self.update_current_state(vehicle)
+        #self.update_current_state(vehicle)
 
         # Reward for moving forward in current lane
         if vehicle.lane in vehicle.navigation.current_ref_lanes:
@@ -484,7 +485,22 @@ class MetaDriveTrajEnv(BaseEnv):
         return step_jerk_list
 
 
-    def update_current_state(self, vehicle):
+    # def update_current_state(self, vehicle):
+    #     vehicle = self.vehicles[vehicle_id]
+    #     t_inverse = 1.0 / self.config['physics_world_step_size']
+    #     theta_t1 = vehicle.traj_wp_list[-2]['yaw']
+    #     theta_t2 = vehicle.traj_wp_list[-1]['yaw']
+    #     v_t1 = vehicle.traj_wp_list[-2]['speed']
+    #     v_t2 = vehicle.traj_wp_list[-1]['speed']
+    #     v_state = np.zeros(6)
+    #     v_state[3] = v_t2
+    #     v_state[4] = (v_t2 - v_t1) * t_inverse 
+    #     theta_dot = (theta_t2 - theta_t1) * t_inverse
+    #     v_state[5] = np.arctan(2.5 * theta_dot / v_t2) if v_t2 > 0.001 else 0.0
+    #     self.z_state = v_state
+
+    def update_current_state(self, vehicle_id):
+        vehicle = self.vehicles[vehicle_id]
         t_inverse = 1.0 / self.config['physics_world_step_size']
         theta_t1 = vehicle.traj_wp_list[-2]['yaw']
         theta_t2 = vehicle.traj_wp_list[-1]['yaw']
@@ -496,8 +512,6 @@ class MetaDriveTrajEnv(BaseEnv):
         theta_dot = (theta_t2 - theta_t1) * t_inverse
         v_state[5] = np.arctan(2.5 * theta_dot / v_t2) if v_t2 > 0.001 else 0.0
         self.z_state = v_state
-
-
 
     def compute_heading_error_list(self, vehicle, lane):
         heading_error_list = []
@@ -560,13 +574,22 @@ class MetaDriveTrajEnv(BaseEnv):
         rewards = {}
         for v_id, v in self.vehicles.items():
             o = self.observations[v_id].observe(v)
+            self.update_current_state(v_id)
             self.vel_speed = v.last_spd
-            if self.config["traj_control_mode"] == 'acc':
+            if self.config["traj_control_mode"] == 'jerk':
                 o_dict = {}
                 o_dict['birdview'] = o 
                 # v_state = np.zeros(4)
                 # v_state[3] = v.last_spd
                 v_state = self.z_state
+                o_dict['vehicle_state'] = v_state
+                #o_dict['speed'] = v.last_spd
+            elif self.config["traj_control_mode"] == 'acc':
+                o_dict = {}
+                o_dict['birdview'] = o 
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state[:4]
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             else:
@@ -690,13 +713,22 @@ class MetaDriveTrajEnv(BaseEnv):
             self.observations[v_id].reset(self, v)
             ret[v_id] = self.observations[v_id].observe(v)
             o = self.observations[v_id].observe(v)
+            self.update_current_state(v_id)
             self.vel_speed = 0
-            if self.config["traj_control_mode"] == 'acc':
+            if self.config["traj_control_mode"] == 'jerk':
                 o_dict = {}
                 o_dict['birdview'] = o 
                 # v_state = np.zeros(4)
                 # v_state[3] = v.last_spd
                 v_state = self.z_state
+                o_dict['vehicle_state'] = v_state
+                #o_dict['speed'] = v.last_spd
+            elif self.config["traj_control_mode"] == 'acc':
+                o_dict = {}
+                o_dict['birdview'] = o 
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state[:4]
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             else:
