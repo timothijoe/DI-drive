@@ -29,8 +29,8 @@ else:
 metadrive_basic_config = dict(
     exp_name = 'z2_jerk_test',
     env=dict(
-        metadrive=dict(use_render=True,
-            show_seq_traj = True,
+        metadrive=dict(use_render=False,
+            show_seq_traj = False,
             traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,

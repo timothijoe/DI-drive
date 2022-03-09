@@ -17,6 +17,7 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 
 
+
 TRAJ_CONTROL_MODE = 'jerk' # 'acc', 'jerk'
 SEQ_TRAJ_LEN = 10
 if TRAJ_CONTROL_MODE == 'acc':
@@ -26,16 +27,17 @@ elif TRAJ_CONTROL_MODE == 'jerk':
 else:
     VAE_LOAD_DIR = None
 metadrive_basic_config = dict(
-    exp_name = 'metadrive_basic_sac',
+    exp_name = 'z2_jerk_test',
     env=dict(
-        metadrive=dict(use_render=True,
-            show_seq_traj = True,
+        metadrive=dict(use_render=False,
+            show_seq_traj = False,
             traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
             #map='XSXS',
             show_interface=False,
+            use_speed_reward = True,
         ),
         manager=dict(
             shared_memory=False,
@@ -44,8 +46,8 @@ metadrive_basic_config = dict(
         ),
         n_evaluator_episode=12,
         stop_value=99999,
-        collector_env_num=1,
-        evaluator_env_num=1,
+        collector_env_num=20,
+        evaluator_env_num=4,
     ),
     policy=dict(
         cuda=True,
@@ -63,7 +65,7 @@ metadrive_basic_config = dict(
             learning_rate=3e-4,
         ),
         collect=dict(
-            n_sample=1000,
+            n_sample=5000,
         ),
         eval=dict(
             evaluator=dict(
@@ -110,18 +112,32 @@ def main(cfg):
     policy = TrajSAC(cfg.policy, model=model)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
-    learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
-    #collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
-    
-    replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
-    import torch
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march08/iteration_40000.pth.tar', map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
-    evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
-    for iter in range(5):
-        stop, reward = evaluator.eval()
-    evaluator.close()
+    learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
+    collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
+    evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
+    replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
 
+    learner.call_hook('before_run')
+
+    while True:
+        if evaluator.should_eval(learner.train_iter):
+            stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
+            if stop:
+                break
+        # Sampling data from environments
+        new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
+        replay_buffer.push(new_data, cur_collector_envstep=collector.envstep)
+        for i in range(cfg.policy.learn.update_per_collect):
+            train_data = replay_buffer.sample(learner.policy.get_attribute('batch_size'), learner.train_iter)
+            if train_data is None:
+                break
+            learner.train(train_data, collector.envstep)
+    learner.call_hook('after_run')
+
+    collector.close()
+    evaluator.close()
+    learner.close()
 
 if __name__ == '__main__':
     main(main_config)

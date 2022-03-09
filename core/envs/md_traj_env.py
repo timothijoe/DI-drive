@@ -116,6 +116,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
     const_episode_max_step = False ,
     episode_max_step = 100,
+    use_speed_reward = False,
 
 )
 
@@ -401,11 +402,11 @@ class MetaDriveTrajEnv(BaseEnv):
 
         # # Speed reward
         # max_spd = 10
-        # speed_list = self.compute_speed_list(vehicle)
-        # for speed in speed_list: 
-        #     reward += self.config["speed_reward"] * (speed / max_spd) * positive_road     
-        #     if speed < 4:
-        #         reward -= 0.04
+        speed_list = self.compute_speed_list(vehicle)
+        for speed in speed_list: 
+            #reward += self.config["speed_reward"] * (speed / max_spd) * positive_road     
+            if speed < 4 and self.config['use_speed_reward'] is True:
+                reward -= 0.0001
 
         # # Heading Reward
         # heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
