@@ -108,6 +108,7 @@ class ConvQAC(QAC):
             vae_latent_dim = 2,
             vae_seq_len = 10,
             vae_dt = 0.1,
+            vae_traj_control_mode = 'jerk',
             vae_load_dir = None,
     ):
         super(QAC, self).__init__()
@@ -192,7 +193,8 @@ class ConvQAC(QAC):
             h_dim = vae_h_dim,
             latent_dim = vae_latent_dim,
             seq_len = vae_seq_len,
-            dt = vae_dt
+            dt = vae_dt,
+            traj_control_mode = vae_traj_control_mode,
         )
         if vae_load_dir is not None:
             self._traj_decoder.load_state_dict(torch.load(vae_load_dir))

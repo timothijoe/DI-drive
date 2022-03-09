@@ -94,6 +94,7 @@ class VaeDecoder(nn.Module):
         seq_len = 30,
         use_relative_pos = True,
         dt = 0.03,
+        traj_control_mode = 'jerk',
         ):
         super(VaeDecoder, self).__init__()
         self.embedding_dim = embedding_dim
@@ -103,14 +104,19 @@ class VaeDecoder(nn.Module):
         self.seq_len = seq_len 
         self.use_relative_pos = use_relative_pos
         self.dt = dt
+        self.traj_control_mode = traj_control_mode
         # input: x, y, theta, v,   output: embedding
-        self.spatial_embedding = nn.Linear(6, self.embedding_dim)
+        if self.traj_control_mode == 'jerk':
+            self.spatial_embedding = nn.Linear(6, self.embedding_dim)
+        elif self.traj_control_mode == 'acc':
+            self.spatial_embedding = nn.Linear(4, self.embedding_dim)
+        #self.spatial_embedding = nn.Linear(6, self.embedding_dim)
         # input: h_dim, output: throttle, steer
         self.hidden2control = nn.Linear(self.h_dim, 2)
         self.decoder = nn.LSTM(self.embedding_dim, self.h_dim, self.num_layers)
         self.init_hidden_decoder = torch.nn.Linear(in_features = self.latent_dim, out_features = self.h_dim * self.num_layers)
 
-    def plant_model_batch(self, prev_state_batch, jerk_batch, steering_rate_batch, dt = 0.03):
+    def plant_model_jerk(self, prev_state_batch, jerk_batch, steering_rate_batch, dt = 0.03):
         # x, y, theta, v, acc, steer, 
         # control, jerk
         #import copy
@@ -144,6 +150,32 @@ class VaeDecoder(nn.Module):
         #current_state = torch.FloatTensor([x_t, y_t, psi_t, v_t_1])
         return current_state
 
+    def plant_model_acc(self, prev_state_batch, pedal_batch, steering_batch, dt = 0.03):
+        #import copy
+        prev_state = prev_state_batch
+        x_t = prev_state[:,0]
+        y_t = prev_state[:,1]
+        psi_t = prev_state[:,2]
+        v_t = prev_state[:,3]
+        pedal_batch = torch.clamp(pedal_batch, -5, 5)
+        steering_batch = torch.clamp(steering_batch, -0.5, 0.5)
+        beta = steering_batch
+        a_t = pedal_batch
+        v_t_1 = v_t + a_t * dt 
+        v_t_1 = torch.clamp(v_t_1, 0, 10)
+        psi_dot = v_t * torch.tan(beta) / 2.5
+        psi_dot = torch.clamp(psi_dot, -3.14 /2,3.14 /2)
+        psi_t_1 = psi_dot*dt + psi_t 
+        x_dot = v_t_1 * torch.cos(psi_t_1)
+        y_dot = v_t_1 * torch.sin(psi_t_1)
+        x_t_1 = x_dot * dt + x_t 
+        y_t_1 = y_dot * dt + y_t
+        
+        #psi_t = self.wrap_angle_rad(psi_t)
+        current_state = torch.stack([x_t_1, y_t_1, psi_t_1, v_t_1], dim = 1)
+        #current_state = torch.FloatTensor([x_t, y_t, psi_t, v_t_1])
+        return current_state
+
     def decode(self, z, init_state):
         generated_traj = []
         prev_state = init_state 
@@ -159,7 +191,11 @@ class VaeDecoder(nn.Module):
             # output shape: 1 x batch x h_dim
             output, decoder_h = self.decoder(decoder_input, decoder_h)
             control = self.hidden2control(output.view(-1, self.h_dim))
-            curr_state = self.plant_model_batch(prev_state, control[:,0], control[:,1], self.dt)
+            if self.traj_control_mode == 'jerk':
+                curr_state = self.plant_model_jerk(prev_state, control[:,0], control[:,1], self.dt)
+            elif self.traj_control_mode == 'acc':
+                curr_state = self.plant_model_acc(prev_state, control[:,0], control[:,1], self.dt)
+            #curr_state = self.plant_model_jerk(prev_state, control[:,0], control[:,1], self.dt)
             generated_traj.append(curr_state)
             decoder_input = self.spatial_embedding(curr_state)
             decoder_input = decoder_input.view(1, -1, self.embedding_dim)
