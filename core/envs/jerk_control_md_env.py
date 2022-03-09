@@ -36,7 +36,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
     start_seed=0,
     use_render=False,
-    environment_num=1,
+    environment_num=5,
 
     # ===== Map Config =====
     map='SSSSSSSSSS',  # int or string: an easy way to fill map_config
@@ -51,7 +51,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     },
 
     # ===== Traffic =====
-    traffic_density=0.0,
+    traffic_density=0.3,
     on_screen=False,
     rgb_clip=True,
     need_inverse_traffic=False,
@@ -116,17 +116,19 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # if const_episode_max_step is True, then for each epoch, no matter how long the path is, we set the same value
     # if not, as defualt, we will calculate the whole path length and assume the car go with 6m/s, we will calculate the time as the step
     # remember this is also related to the seq_traj_len. For each step we execute seq_traj_len times of interactions
-    const_episode_max_step = False ,
-    episode_max_step = 100,
+    #const_episode_max_step = False,
+    #episode_max_step = 100,
 
-    traj_control_mode = 'acc' # another type is 'jerk'
+    #traj_control_mode = 'acc', # another type is 'jerk'
+    traj_control_mode = 'jerk',
     # if we choose traj_control_mode = 'acc', then the current state is [0,0,0,v] and the control signal is throttle and steer
     # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
-
+    const_episode_max_step = False ,
+    episode_max_step = 100,
 )
 
 
-class JerkControlMdEnd(BaseEnv):
+class JerkControlMdEnv(BaseEnv):
 
     @classmethod
     def default_config(cls) -> "Config":
@@ -173,19 +175,19 @@ class JerkControlMdEnd(BaseEnv):
         self.time = 0
         self.step_num = 0
         self.episode_rwd = 0
-        if not self.config["const_control"]:
-            self.vae_decoder = WpDecoder(
-                control_num = 2,
-                seq_len = self.config['seq_traj_len'],
-                dt = 0.1
-                )
-        else:
-            self.vae_decoder = CCDecoder(
-                control_num = 2,
-                seq_len = self.config['seq_traj_len'],
-                dt = 0.1
-            )
-        vae_load_dir = 'ckpt_files/a79_decoder_ckpt'
+        # if not self.config["const_control"]:
+        #     self.vae_decoder = WpDecoder(
+        #         control_num = 2,
+        #         seq_len = self.config['seq_traj_len'],
+        #         dt = 0.1
+        #         )
+        # else:
+        #     self.vae_decoder = CCDecoder(
+        #         control_num = 2,
+        #         seq_len = self.config['seq_traj_len'],
+        #         dt = 0.1
+        #     )
+        # vae_load_dir = 'ckpt_files/a79_decoder_ckpt'
         #self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
         self.vel_speed = 0.0
         self.z_state = np.zeros(6)
@@ -243,7 +245,7 @@ class JerkControlMdEnd(BaseEnv):
         return config
 
     def _post_process_config(self, config):
-        config = super(JerkControlMdEnd, self)._post_process_config(config)
+        config = super(JerkControlMdEnv, self)._post_process_config(config)
         if not config["rgb_clip"]:
             logging.warning(
                 "You have set rgb_clip = False, which means the observation will be uint8 values in [0, 255]. "
@@ -362,7 +364,7 @@ class JerkControlMdEnd(BaseEnv):
                 self.episode_max_step = self.get_episode_max_step(self.navi_distance)
             #print('zt dist: {}'.format(self.navi_distance))
             self._compute_navi_dist = False
-        self.update_current_state(vehicle)
+        #self.update_current_state(vehicle)
         
         step_info = dict()
 
@@ -483,7 +485,8 @@ class JerkControlMdEnd(BaseEnv):
             step_jerk_list.append(np.linalg.norm(jerk))
         return step_jerk_list
 
-    def update_current_state(self, vehicle):
+    def update_current_state(self, vehicle_id):
+        vehicle = self.vehicles[vehicle_id]
         t_inverse = 1.0 / self.config['physics_world_step_size']
         theta_t1 = vehicle.traj_wp_list[-2]['yaw']
         theta_t2 = vehicle.traj_wp_list[-1]['yaw']
@@ -560,14 +563,23 @@ class JerkControlMdEnd(BaseEnv):
         rewards = {}
         for v_id, v in self.vehicles.items():
             o = self.observations[v_id].observe(v)
+            self.update_current_state(v_id)
             self.vel_speed = v.last_spd
 
-            if self.config["traj_control_mode"] == 'acc':
+            if self.config["traj_control_mode"] == 'jerk':
                 o_dict = {}
                 o_dict['birdview'] = o 
                 # v_state = np.zeros(4)
                 # v_state[3] = v.last_spd
                 v_state = self.z_state
+                o_dict['vehicle_state'] = v_state
+                #o_dict['speed'] = v.last_spd
+            elif self.config["traj_control_mode"] == 'acc':
+                o_dict = {}
+                o_dict['birdview'] = o 
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state[:4]
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             else:
@@ -611,7 +623,7 @@ class JerkControlMdEnd(BaseEnv):
             return obses, rewards, dones, step_infos
 
     def setup_engine(self):
-        super(JerkControlMdEnd, self).setup_engine()
+        super(JerkControlMdEnv, self).setup_engine()
         self.engine.accept("b", self.switch_to_top_down_view)
         self.engine.accept("q", self.switch_to_third_person_view)
         from core.utils.simulator_utils.md_utils.traffic_manager_utils import MacroTrafficManager
@@ -708,13 +720,22 @@ class JerkControlMdEnd(BaseEnv):
             # o_dict['birdview'] = o 
             # o_dict['speed'] = v.last_spd
             #obses[v_id] =  o_dict #o
+            self.update_current_state(v_id)
             self.vel_speed = 0
-            if self.config["traj_control_mode"] == 'acc':
+            if self.config["traj_control_mode"] == 'jerk':
                 o_dict = {}
                 o_dict['birdview'] = o 
                 # v_state = np.zeros(4)
                 # v_state[3] = v.last_spd
                 v_state = self.z_state
+                o_dict['vehicle_state'] = v_state
+                #o_dict['speed'] = v.last_spd
+            elif self.config["traj_control_mode"] == 'acc':
+                o_dict = {}
+                o_dict['birdview'] = o 
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state[:4]
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             else:

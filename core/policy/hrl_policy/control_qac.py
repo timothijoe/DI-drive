@@ -9,7 +9,7 @@ from ding.model.common import RegressionHead, ReparameterizationHead, FCEncoder
 from typing import Tuple, Optional
 from ding.torch_utils import ResBlock, Flatten
 #from core.policy.ad_policy.traj_vae import VaeDecoder
-from core.policy.hrl_policy.traj_vae import VaeDecoder, WpDecoder
+from core.policy.hrl_policy.control_decoder import WpDecoder
 class ConvEncoder(nn.Module):
     r"""
     Overview:
@@ -103,12 +103,13 @@ class ControlQAC(QAC):
             critic_head_layer_num: int = 1,
             activation: Optional[nn.Module] = nn.ReLU(),
             norm_type: Optional[str] = None,
-            vae_embedding_dim = 64,
-            vae_h_dim = 64,
-            vae_latent_dim = 2,
+            #vae_embedding_dim = 64,
+            #vae_h_dim = 64,
+            #vae_latent_dim = 2,
             vae_seq_len = 1,
             vae_dt = 0.1,
-            vae_load_dir = None,
+            vae_traj_control_mode = 'jerk',
+            #vae_load_dir = None,
     ):
         super(QAC, self).__init__()
         obs_shape: int = squeeze(obs_shape)
@@ -192,6 +193,7 @@ class ControlQAC(QAC):
             seq_len = vae_seq_len,
             use_relative_pos = True,
             dt = vae_dt,
+            traj_control_mode = vae_traj_control_mode,
         )
 
         # if vae_load_dir is not None:
