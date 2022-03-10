@@ -23,7 +23,7 @@ SEQ_TRAJ_LEN = 10
 if TRAJ_CONTROL_MODE == 'acc':
     VAE_LOAD_DIR = 'ckpt_files/seq_len_10_decoder_ckpt'
 elif TRAJ_CONTROL_MODE == 'jerk': 
-    VAE_LOAD_DIR = 'ckpt_files/jerk_ckpt'
+    VAE_LOAD_DIR = 'ckpt_files/new_jerk_decoder_ckpt'
 else:
     VAE_LOAD_DIR = None
 metadrive_basic_config = dict(
@@ -37,6 +37,7 @@ metadrive_basic_config = dict(
             #map='OSOS', 
             #map='XSXS',
             show_interface=False,
+            use_speed_reward = True,
         ),
         manager=dict(
             shared_memory=False,

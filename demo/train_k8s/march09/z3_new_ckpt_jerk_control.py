@@ -27,7 +27,7 @@ elif TRAJ_CONTROL_MODE == 'jerk':
 else:
     VAE_LOAD_DIR = None
 metadrive_basic_config = dict(
-    exp_name = 'z2_jerk_test',
+    exp_name = 'z3_jerk_test_with_vel',
     env=dict(
         metadrive=dict(use_render=False,
             show_seq_traj = False,

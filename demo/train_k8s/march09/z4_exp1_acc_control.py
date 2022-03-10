@@ -22,15 +22,16 @@ SEQ_TRAJ_LEN = 1
 
 
 metadrive_basic_config = dict(
-    exp_name = 'az3_exp1_sac_inter',
+    exp_name = 'az3_exp1_acc',
     env=dict(
         metadrive=dict(
-            use_render=True,
+            use_render=False,
             seq_traj_len = SEQ_TRAJ_LEN,
             #use_jerk_penalty = True,
             #use_lateral_penalty = False,
             traffic_density = 0.3,
             traj_control_mode = TRAJ_CONTROL_MODE,
+            use_speed_reward = True,
             #half_jerk = False,
             #map='XSXS', 
             #use_lateral = True, 
@@ -42,8 +43,8 @@ metadrive_basic_config = dict(
         ),
         n_evaluator_episode=12,
         stop_value=99999,
-        collector_env_num=1,
-        evaluator_env_num=1,
+        collector_env_num=20,
+        evaluator_env_num=4,
     ),
     policy=dict(
         cuda=True,
@@ -55,12 +56,12 @@ metadrive_basic_config = dict(
             vae_seq_len = SEQ_TRAJ_LEN,
         ),
         learn=dict(
-            update_per_collect=10,
+            update_per_collect=100,
             batch_size=64,
             learning_rate=3e-4,
         ),
         collect=dict(
-            n_sample=100,
+            n_sample=5000,
         ),
         eval=dict(
             evaluator=dict(
