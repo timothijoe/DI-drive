@@ -125,6 +125,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
     const_episode_max_step = False ,
     episode_max_step = 100,
+    use_speed_reward = False,
 )
 
 
@@ -396,6 +397,17 @@ class JerkControlMdEnv(BaseEnv):
         # Driving reward   
         # No matter how many wp is    
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
+
+        # # Speed reward
+        max_spd = 10
+        speed_list = self.compute_speed_list(vehicle)
+        for speed in speed_list: 
+            # reward += self.config["speed_reward"] * (speed / max_spd) * positive_road 
+            if self.config['use_speed_reward'] is True:
+                reward += 0.0005 * (speed / max_spd) * positive_road    
+                if speed < 4:
+                    reward -= 0.0002
+
 
         # # Speed reward
         # max_spd = 10

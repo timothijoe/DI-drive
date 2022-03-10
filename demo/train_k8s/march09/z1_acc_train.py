@@ -37,6 +37,7 @@ metadrive_basic_config = dict(
             #map='OSOS', 
             #map='XSXS',
             show_interface=False,
+            use_speed_reward = True,
         ),
         manager=dict(
             shared_memory=False,

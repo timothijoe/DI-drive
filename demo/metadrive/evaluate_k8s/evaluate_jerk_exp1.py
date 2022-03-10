@@ -17,8 +17,8 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 from core.policy.hrl_policy.control_qac import ControlQAC 
 from core.policy.hrl_policy.traj_sac import TrajSAC
 
-TRAJ_CONTROL_MODE = 'jerk' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 10
+TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
+SEQ_TRAJ_LEN = 1
 
 
 metadrive_basic_config = dict(
@@ -31,6 +31,7 @@ metadrive_basic_config = dict(
             #use_lateral_penalty = False,
             traffic_density = 0.3,
             traj_control_mode = TRAJ_CONTROL_MODE,
+            use_speed_reward = True,
             #half_jerk = False,
             #map='XSXS', 
             #use_lateral = True, 
@@ -113,7 +114,7 @@ def main(cfg):
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     #replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march08/iteration_40000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march09/exp1_acc/iteration_30000.pth.tar', map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     for iter in range(5):

@@ -401,13 +401,15 @@ class MetaDriveTrajEnv(BaseEnv):
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
 
         # # Speed reward
-        # max_spd = 10
+        max_spd = 10
         speed_list = self.compute_speed_list(vehicle)
         for speed in speed_list: 
-            #reward += self.config["speed_reward"] * (speed / max_spd) * positive_road     
-            if speed < 4 and self.config['use_speed_reward'] is True:
-                reward -= 0.0001
-
+            # reward += self.config["speed_reward"] * (speed / max_spd) * positive_road 
+            if self.config['use_speed_reward'] is True:
+                reward += 0.0005 * (speed / max_spd) * positive_road    
+                if speed < 4:
+                    reward -= 0.0002
+            
         # # Heading Reward
         # heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
         # for heading_error in heading_error_list:
