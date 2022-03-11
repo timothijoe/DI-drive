@@ -30,12 +30,16 @@ metadrive_basic_config = dict(
     env=dict(
         metadrive=dict(use_render=True,
             show_seq_traj = True,
-            traffic_density = 0.4,
+            traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
             #map='XSXS',
             show_interface=False,
+            use_lateral=True,
+            use_speed_reward = True,
+            use_heading_reward = True,
+            use_jerk_reward = True,
         ),
         manager=dict(
             shared_memory=False,
@@ -115,7 +119,7 @@ def main(cfg):
     
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march09/exp3_jerk/iteration_30000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march11/jerk_control_bare/iteration_10000.pth.tar', map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     for iter in range(5):
