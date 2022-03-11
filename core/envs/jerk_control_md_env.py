@@ -417,7 +417,7 @@ class JerkControlMdEnv(BaseEnv):
             if self.config["use_jerk_penalty"]:
                 jerk_list = self.compute_jerk_list(vehicle)
                 for jerk in jerk_list:
-                    reward += (0.03 - 0.3 * np.tanh(jerk / 100.0))
+                    reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
 
         # # Speed reward
         # max_spd = 10

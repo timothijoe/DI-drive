@@ -39,6 +39,7 @@ metadrive_basic_config = dict(
             show_interface=False,
             use_origin_setting = True,
             use_jerk_penalty = False,
+            use_lateral = False,
         ),
         manager=dict(
             shared_memory=False,

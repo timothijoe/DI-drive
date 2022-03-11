@@ -38,7 +38,8 @@ metadrive_basic_config = dict(
             #map='XSXS',
             show_interface=False,
             use_origin_setting = True,
-            use_jerk_penalty = False,
+            use_jerk_penalty = True,
+            use_lateral = True,
         ),
         manager=dict(
             shared_memory=False,

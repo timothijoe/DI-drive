@@ -82,12 +82,12 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # ===== Reward Scheme =====
     # See: https://github.com/decisionforce/metadrive/issues/283
-    success_reward= 1.0, #10.0,
-    out_of_road_penalty= 0.0, #5.0,
-    crash_vehicle_penalty=0.0, #1.0,
-    crash_object_penalty=0.0, #5.0,
-    run_out_of_time_penalty = 0.0, #5.0,
-    driving_reward=1.0,
+    success_reward= 10.0, #10.0,
+    out_of_road_penalty= 5.0, #5.0,
+    crash_vehicle_penalty=1.0, #1.0,
+    crash_object_penalty=5.0, #5.0,
+    run_out_of_time_penalty = 5.0, #5.0,
+    driving_reward=0.2,
     speed_reward=0.05,
     heading_reward = 0.15, 
     use_lateral=True,
@@ -115,8 +115,9 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # if we choose traj_control_mode = 'acc', then the current state is [0,0,0,v] and the control signal is throttle and steer
     # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
     const_episode_max_step = False ,
-    episode_max_step = 100,
+    episode_max_step = 150,
     use_speed_reward = False,
+    use_origin_setting = False,
 
 )
 
@@ -384,18 +385,18 @@ class MetaDriveTrajEnv(BaseEnv):
 
 
 
-        #avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
-        #use_lateral_penalty = False
-        # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
-        # if self.config["use_lateral"]:
-        #     lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
-        #     #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
-        # else:
-        #     lateral_factor = 1.0
+        avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
+        # use_lateral_penalty = False
+        # # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
+        if self.config["use_lateral"]:
+            lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+        else:
+            lateral_factor = 1.0
         #     use_lateral_penalty = True
 
         reward = 0.0
-        lateral_factor = 1.0 / self.navi_distance
+        #lateral_factor = 1.0 / self.navi_distance
         # Driving reward   
         # No matter how many wp is    
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
@@ -404,24 +405,20 @@ class MetaDriveTrajEnv(BaseEnv):
         max_spd = 10
         speed_list = self.compute_speed_list(vehicle)
         for speed in speed_list: 
-            # reward += self.config["speed_reward"] * (speed / max_spd) * positive_road 
-            if self.config['use_speed_reward'] is True:
-                reward += 0.0005 * (speed / max_spd) * positive_road    
-                if speed < 4:
-                    reward -= 0.0002
-            
-        # # Heading Reward
-        # heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
-        # for heading_error in heading_error_list:
-        #     reward += self.config["heading_reward"] * (0 - np.abs(heading_error))    
+            reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
+            if speed < 4:
+                reward -= 0.04
+                
+        if self.config["use_origin_setting"]:
+            # Heading Reward
+            heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
+            for heading_error in heading_error_list:
+                reward += self.config["heading_reward"] * (0 - np.abs(heading_error))             
 
-        # if self.config["use_jerk_penalty"]:
-        #     jerk_list = self.compute_jerk_list(vehicle)
-        #     for jerk in jerk_list:
-        #         reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
-        # if use_lateral_penalty:
-        #     lateral_penalty = avg_lateral_cum
-        #     reward -= lateral_penalty /4 * 0.5
+            if self.config["use_jerk_penalty"]:
+                jerk_list = self.compute_jerk_list(vehicle)
+                for jerk in jerk_list:
+                    reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
         step_info["step_reward"] = reward
 
 
