@@ -88,10 +88,10 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     crash_vehicle_penalty=0.0,
     crash_object_penalty=0.0,
     run_out_of_time_penalty = 0.0,
-    driving_reward= 1.0,  #1.0,
-    #speed_reward=0.05,
-    #heading_reward = 0.15, 
-    #use_lateral=True,
+
+    driving_reward=0.2,
+    speed_reward=0.05,
+    heading_reward = 0.15, 
 
     # ===== Cost Scheme =====
     crash_vehicle_cost=1.0,
@@ -105,13 +105,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Trajectory length =====
     seq_traj_len = 10,
     show_seq_traj = False,
-    
-
-    use_jerk_penalty = False,
-    use_lateral_penalty = False,
     const_control = False,
-    half_jerk = False,
-
 
     # if const_episode_max_step is True, then for each epoch, no matter how long the path is, we set the same value
     # if not, as defualt, we will calculate the whole path length and assume the car go with 6m/s, we will calculate the time as the step
@@ -123,9 +117,15 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     traj_control_mode = 'jerk',
     # if we choose traj_control_mode = 'acc', then the current state is [0,0,0,v] and the control signal is throttle and steer
     # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
-    const_episode_max_step = False ,
-    episode_max_step = 100,
-    use_speed_reward = False,
+    # Reward Option Scheme
+    const_episode_max_step = False,
+    episode_max_step = 150,
+
+    use_lateral=True,
+    lateral_scale = 0.5, 
+    use_speed_reward = True,
+    use_heading_reward = False,
+    use_jerk_reward = False,
 )
 
 
@@ -359,16 +359,13 @@ class JerkControlMdEnv(BaseEnv):
         :return: reward
         """
         vehicle = self.vehicles[vehicle_id]
+        step_info = dict()
         if self._compute_navi_dist:
             self.navi_distance = self.get_navigation_len(vehicle)
             if not self.config['const_episode_max_step']:
                 self.episode_max_step = self.get_episode_max_step(self.navi_distance)
-            #print('zt dist: {}'.format(self.navi_distance))
             self._compute_navi_dist = False
         #self.update_current_state(vehicle)
-        
-        step_info = dict()
-
         # Reward for moving forward in current lane
         if vehicle.lane in vehicle.navigation.current_ref_lanes:
             current_lane = vehicle.lane
@@ -380,61 +377,46 @@ class JerkControlMdEnv(BaseEnv):
         long_last, _ = current_lane.local_coordinates(vehicle.last_macro_position)
         long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
         self.already_go_dist += (long_now - long_last)
-        # print('have gone: {}'.format(self.already_go_dist))
-
-        # avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
+        #print('already_go_dist: {}'.format(self.already_go_dist))
+        avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
         # use_lateral_penalty = False
         # # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
-        # if self.config["use_lateral"]:
-        #     lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
-        #     #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
-        # else:
-        #     lateral_factor = 1.0
+        if self.config["use_lateral"]:
+            lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+        else:
+            lateral_factor = 1.0
         #     use_lateral_penalty = True
-
         reward = 0.0
-        lateral_factor = 1.0 / self.navi_distance
-        # Driving reward   
-        # No matter how many wp is    
-        reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
-
+        driving_reward = 0.0
+        speed_reward = 0.0
+        heading_reward = 0.0
+        jerk_reward = 0.0 
+        # Generally speaking, driving reward is a necessity
+        driving_reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
         # # Speed reward
-        max_spd = 10
-        speed_list = self.compute_speed_list(vehicle)
-        for speed in speed_list: 
-            # reward += self.config["speed_reward"] * (speed / max_spd) * positive_road 
-            if self.config['use_speed_reward'] is True:
-                reward += 0.0005 * (speed / max_spd) * positive_road    
+        if self.config["use_speed_reward"]:
+            max_spd = 10
+            speed_list = self.compute_speed_list(vehicle)
+            for speed in speed_list: 
+                speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
                 if speed < 4:
-                    reward -= 0.0002
-
-
-        # # Speed reward
-        # max_spd = 10
-        # speed_list = self.compute_speed_list(vehicle)
-        # for speed in speed_list: 
-        #     reward += self.config["speed_reward"] * (speed / max_spd) * positive_road     
-        #     if speed < 4:
-        #         reward -= 0.04
-
-        # # Heading Reward
-        # heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
-        # for heading_error in heading_error_list:
-        #     reward += self.config["heading_reward"] * (0 - np.abs(heading_error))    
-
-        # if self.config["use_jerk_penalty"]:
-        #     jerk_list = self.compute_jerk_list(vehicle)
-        #     for jerk in jerk_list:
-        #         if not self.config["half_jerk"]:
-        #             reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
-        #         else:
-        #             reward += (0.03 - 0.3 * np.tanh(jerk / 100.0))
-        # if use_lateral_penalty:
-        #     lateral_penalty = avg_lateral_cum
-        #     reward -= lateral_penalty /4 * 0.3
+                    speed_reward -= 0.04    
+        if self.config["use_heading_reward"]:
+            # Heading Reward
+            heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
+            for heading_error in heading_error_list:
+                heading_reward += self.config["heading_reward"] * (0 - np.abs(heading_error))             
+        if self.config["use_jerk_reward"]:
+            jerk_list = self.compute_jerk_list(vehicle)
+            for jerk in jerk_list:
+                jerk_reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
+        reward = driving_reward + speed_reward + heading_reward + jerk_reward 
+        print('driving reward: {}'.format(driving_reward))
+        print('speed reward: {}'.format(speed_reward))
+        print('heading reward: {}'.format(heading_reward))
+        print('jerk reward: {}'.format(jerk_reward))
         step_info["step_reward"] = reward
-
-
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
         elif vehicle.macro_succ:

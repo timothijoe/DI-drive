@@ -31,6 +31,7 @@ metadrive_basic_config = dict(
             #use_lateral_penalty = False,
             traffic_density = 0.3,
             traj_control_mode = TRAJ_CONTROL_MODE,
+            use_speed_reward = True,
             #half_jerk = False,
             #map='XSXS', 
             #use_lateral = True, 
