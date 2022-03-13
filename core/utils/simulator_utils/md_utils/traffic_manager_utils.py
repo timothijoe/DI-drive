@@ -77,7 +77,7 @@ class MacroTrafficManager(TrafficManager):
         for block in map.blocks[1:]:
             xb_dist = min(abs(block.bounding_box[0]),abs(block.bounding_box[1]))
             yb_dist = min(abs(block.bounding_box[2]),abs(block.bounding_box[3]))
-            dist_constrain = 200
+            dist_constrain = 250
             if xb_dist*xb_dist + yb_dist * yb_dist > dist_constrain *dist_constrain:
                 continue
             trigger_lanes = block.get_intermediate_spawn_lanes()

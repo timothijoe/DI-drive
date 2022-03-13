@@ -9,67 +9,63 @@ from ding.config import compile_config
 from ding.policy import SACPolicy
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, NaiveReplayBuffer
 from core.envs import DriveEnvWrapper
-#from core.policy.ad_policy.conv_qac import ConvQAC
+from core.policy.ad_policy.conv_qac import ConvQAC
+#from core.envs.md_control_env import MetaDriveControlEnv
+#from core.envs.jerk_control_md_env import JerkControlMdEnv
 from core.envs.md_traj_env import MetaDriveTrajEnv
-from core.policy.hrl_policy.traj_qac import ConvQAC 
-from core.policy.hrl_policy.traj_sac import TrajSAC
 from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
-
-
+#from core.policy.hrl_policy.traj_qac import ConvQAC 
+from core.policy.hrl_policy.control_qac import ControlQAC 
+from core.policy.hrl_policy.traj_sac import TrajSAC
 
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 10
-if TRAJ_CONTROL_MODE == 'acc':
-    VAE_LOAD_DIR = 'ckpt_files/seq_len_10_decoder_ckpt'
-elif TRAJ_CONTROL_MODE == 'jerk': 
-    VAE_LOAD_DIR = 'ckpt_files/new_jerk_decoder_ckpt'
-else:
-    VAE_LOAD_DIR = None
+SEQ_TRAJ_LEN = 1
+
 metadrive_basic_config = dict(
-    exp_name = 'metadrive_basic_sac',
+    exp_name = 'az3_exp1_sac_inter',
     env=dict(
-        metadrive=dict(use_render=True,
-            show_seq_traj = True,
-            traffic_density = 0.35,
+        metadrive=dict(
+            use_render=True,
             seq_traj_len = SEQ_TRAJ_LEN,
+            #use_jerk_penalty = True,
+            #use_lateral_penalty = False,
+            traffic_density = 0.35,
             traj_control_mode = TRAJ_CONTROL_MODE,
-            #map='OSOS', 
-            #map='XSXS',
-            map='SSSSSSS',
-            #show_interface=False,
-            use_lateral=True,
             use_speed_reward = True,
-            use_heading_reward = True,
-            use_jerk_reward = True,
+            #const_episode_max_step = True, 
+            #episode_max_step = 100,
+            #half_jerk = False,
+            #map='XSXS', 
+            #use_lateral = True, 
             show_interface=False,
-        ),
+            ),
         manager=dict(
             shared_memory=False,
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=1,
+        n_evaluator_episode=12,
         stop_value=99999,
         collector_env_num=1,
         evaluator_env_num=1,
     ),
     policy=dict(
-        cuda=False,
+        cuda=True,
         model=dict(
             obs_shape=[5, 200, 200],
-            action_shape=2,
+            action_shape=2 * SEQ_TRAJ_LEN,
             encoder_hidden_size_list=[128, 128, 64],
-            vae_seq_len = SEQ_TRAJ_LEN,
             vae_traj_control_mode = TRAJ_CONTROL_MODE,
-            vae_load_dir= VAE_LOAD_DIR, #'/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/jerk_ckpt',
+            vae_seq_len = SEQ_TRAJ_LEN,
         ),
         learn=dict(
-            update_per_collect=100,
+            update_per_collect=10,
             batch_size=64,
             learning_rate=3e-4,
+            auto_alpha=False,
         ),
         collect=dict(
-            n_sample=1000,
+            n_sample=10,
         ),
         eval=dict(
             evaluator=dict(
@@ -112,21 +108,21 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    model = ConvQAC(**cfg.policy.model)
+    model = ControlQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
     #collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
-    
+    #evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
+    #replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/acc_full_reward/iteration_50000.pth.tar', map_location = 'cpu'))
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))
+    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/exp1_acc/iteration_60000.pth.tar', map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
-    for iter in range(2):
+    for iter in range(5):
         stop, reward = evaluator.eval()
     evaluator.close()
 

@@ -43,6 +43,7 @@ class MetadriveEvaluator(InteractionSerialEvaluator):
         '''
         z_success_times = 0
         z_fail_times = 0
+        seq_traj_len = 10
         complete_ratio_list = []
         if n_episode is None:
             n_episode = self._default_n_episode
@@ -72,6 +73,7 @@ class MetadriveEvaluator(InteractionSerialEvaluator):
                         self._policy.reset([env_id])
                         reward = t.info['final_eval_reward']
                         arrive_dest = t.info['arrive_dest']
+                        seq_traj_len = t.info['seq_traj_len']
                         if arrive_dest:
                             z_success_times += 1
                         else:
@@ -103,6 +105,7 @@ class MetadriveEvaluator(InteractionSerialEvaluator):
             'reward_max': np.max(episode_reward),
             'reward_min': np.min(episode_reward),
             # 'each_reward': episode_reward,
+            # 'zt env step': seq_traj_len * envstep_count,
         }
         episode_info = eval_monitor.get_episode_info()
         if episode_info is not None:
@@ -138,11 +141,14 @@ class MetadriveEvaluator(InteractionSerialEvaluator):
             print('average complete ratio: {}'.format(average_complete_ratio))
             print(complete_ratio_list)
         self._tb_logger.add_scalar('episode_info/succ_rate_iter', success_ratio, train_iter)
-        self._tb_logger.add_scalar('episode_info/succ_rate_step', success_ratio, envstep)
+        self._tb_logger.add_scalar('episode_info/succ_rate_step', success_ratio, envstep * seq_traj_len)
         self._tb_logger.add_scalar('episode_info/complete_ratio_mean_iter', np.mean(complete_ratio_list), train_iter)
-        self._tb_logger.add_scalar('episode_info/complete_ratio_mean_step', np.mean(complete_ratio_list), envstep)
+        self._tb_logger.add_scalar('episode_info/complete_ratio_mean_step', np.mean(complete_ratio_list), envstep * seq_traj_len)
         self._tb_logger.add_scalar('episode_info/complete_ratio_std_iter', np.std(complete_ratio_list), train_iter)
-        self._tb_logger.add_scalar('episode_info/complete_ratio_std_step', np.std(complete_ratio_list), envstep)
+        self._tb_logger.add_scalar('episode_info/complete_ratio_std_step', np.std(complete_ratio_list), envstep * seq_traj_len)
+        # print('zt env step: {}'.format(envstep * float(seq_traj_len)))
+        # print('env step: {}'.format(envstep))
+        # print('seq len : {}'.format(seq_traj_len))
         # self._tb_logger.add_scalar('succ_rate/', success_ratio, train_iter)
         # self._tb_logger.add_scalar('succ_rate/', success_ratio, envstep)
 
