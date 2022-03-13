@@ -84,12 +84,12 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # See: https://github.com/decisionforce/metadrive/issues/283
     success_reward= 10.0, #10.0,
     out_of_road_penalty= 5.0, #5.0,
-    crash_vehicle_penalty=1.0, #1.0,
+    crash_vehicle_penalty=5.0, #1.0,
     crash_object_penalty=5.0, #5.0,
     run_out_of_time_penalty = 5.0, #5.0,
     driving_reward=0.2,
-    speed_reward=0.05,
-    heading_reward = 0.15, 
+    speed_reward=0.1,
+    heading_reward = 0.05, 
 
 
     # ===== Cost Scheme =====
@@ -119,7 +119,10 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     episode_max_step = 150,
 
     use_lateral=True,
-    lateral_scale = 0.5, 
+    lateral_scale = 0.25, 
+
+    jerk_dominator = 50.0,
+    jerk_importance = 0.6,
     use_speed_reward = True,
     use_heading_reward = False,
     use_jerk_reward = False,
@@ -331,6 +334,7 @@ class MetaDriveTrajEnv(BaseEnv):
             or done_info[TerminationState.CRASH_BUILDING]
         )
         done_info['complete_ratio'] = clip(self.already_go_dist/ self.navi_distance + 0.05, 0.0, 1.0)
+        done_info['seq_traj_len'] = self.config['seq_traj_len']
 
         return done, done_info
 
@@ -415,7 +419,8 @@ class MetaDriveTrajEnv(BaseEnv):
         if self.config["use_jerk_reward"]:
             jerk_list = self.compute_jerk_list(vehicle)
             for jerk in jerk_list:
-                jerk_reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
+                #jerk_reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
+                jerk_reward += (0.03 - self.config["jerk_importance"] * np.tanh(jerk / self.config["jerk_dominator"]))
         reward = driving_reward + speed_reward + heading_reward + jerk_reward 
         # print('driving reward: {}'.format(driving_reward))
         # print('speed reward: {}'.format(speed_reward))
@@ -792,7 +797,7 @@ class MetaDriveTrajEnv(BaseEnv):
             angle_in_rad += 2 * np.pi
         return angle_in_rad
 
-    def get_episode_max_step(self, distance, average_speed = 6.0):
+    def get_episode_max_step(self, distance, average_speed = 7.0):
         average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
         max_step = int(distance / average_dist_per_step) + 1
         return max_step

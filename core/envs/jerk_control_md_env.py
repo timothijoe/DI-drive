@@ -412,10 +412,10 @@ class JerkControlMdEnv(BaseEnv):
             for jerk in jerk_list:
                 jerk_reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
         reward = driving_reward + speed_reward + heading_reward + jerk_reward 
-        print('driving reward: {}'.format(driving_reward))
-        print('speed reward: {}'.format(speed_reward))
-        print('heading reward: {}'.format(heading_reward))
-        print('jerk reward: {}'.format(jerk_reward))
+        # print('driving reward: {}'.format(driving_reward))
+        # print('speed reward: {}'.format(speed_reward))
+        # print('heading reward: {}'.format(heading_reward))
+        # print('jerk reward: {}'.format(jerk_reward))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]

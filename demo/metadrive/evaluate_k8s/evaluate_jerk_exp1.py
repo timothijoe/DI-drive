@@ -17,7 +17,7 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 from core.policy.hrl_policy.control_qac import ControlQAC 
 from core.policy.hrl_policy.traj_sac import TrajSAC
 
-TRAJ_CONTROL_MODE = 'jerk' # 'acc', 'jerk'
+TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
 SEQ_TRAJ_LEN = 1
 
 
@@ -29,14 +29,15 @@ metadrive_basic_config = dict(
             seq_traj_len = SEQ_TRAJ_LEN,
             #use_jerk_penalty = True,
             #use_lateral_penalty = False,
-            traffic_density = 0.3,
+            traffic_density = 0.35,
             traj_control_mode = TRAJ_CONTROL_MODE,
             use_speed_reward = True,
-            const_episode_max_step = True, 
-            episode_max_step = 100,
+            #const_episode_max_step = True, 
+            #episode_max_step = 100,
             #half_jerk = False,
             #map='XSXS', 
             #use_lateral = True, 
+            show_interface=False,
             ),
         manager=dict(
             shared_memory=False,
@@ -117,7 +118,8 @@ def main(cfg):
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     #replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march09/exp1_acc/iteration_30000.pth.tar', map_location = 'cpu'))
+    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/exp1_acc/iteration_60000.pth.tar', map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     for iter in range(5):

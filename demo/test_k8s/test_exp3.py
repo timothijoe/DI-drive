@@ -64,16 +64,16 @@ metadrive_basic_config = dict(
             vae_load_dir= VAE_LOAD_DIR, #'/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/jerk_ckpt',
         ),
         learn=dict(
-            update_per_collect=100,
+            update_per_collect=10,
             batch_size=64,
             learning_rate=3e-4,
         ),
         collect=dict(
-            n_sample=1000,
+            n_sample=50,
         ),
         eval=dict(
             evaluator=dict(
-                eval_freq=1000,
+                eval_freq=10,
                 )
             ),
         other=dict(
@@ -123,10 +123,10 @@ def main(cfg):
     import torch
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/acc_full_reward/iteration_50000.pth.tar', map_location = 'cpu'))
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))
+    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
-    evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
-    for iter in range(2):
+    evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
+    for iter in range(5):
         stop, reward = evaluator.eval()
     evaluator.close()
 
