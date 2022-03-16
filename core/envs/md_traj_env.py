@@ -121,8 +121,9 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     use_lateral=True,
     lateral_scale = 0.25, 
 
-    jerk_dominator = 50.0,
-    jerk_importance = 0.6,
+    jerk_bias = 10.0, 
+    jerk_dominator = 10.0, #50.0
+    jerk_importance = 0.14, # 0.6
     use_speed_reward = True,
     use_heading_reward = False,
     use_jerk_reward = False,
@@ -420,7 +421,10 @@ class MetaDriveTrajEnv(BaseEnv):
             jerk_list = self.compute_jerk_list(vehicle)
             for jerk in jerk_list:
                 #jerk_reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
-                jerk_reward += (0.03 - self.config["jerk_importance"] * np.tanh(jerk / self.config["jerk_dominator"]))
+                #jerk_reward += (0.03 - self.config["jerk_importance"] * np.tanh(jerk / self.config["jerk_dominator"]))
+                jerk_penalty = max(np.tanh((jerk-self.config["jerk_bias"])/self.config["jerk_dominator"]),0)
+                jerk_penalty = self.config["jerk_importance"] * jerk_penalty
+                jerk_reward -= jerk_penalty
         reward = driving_reward + speed_reward + heading_reward + jerk_reward 
         # print('driving reward: {}'.format(driving_reward))
         # print('speed reward: {}'.format(speed_reward))
