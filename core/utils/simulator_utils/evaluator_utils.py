@@ -74,6 +74,7 @@ class MetadriveEvaluator(InteractionSerialEvaluator):
                         reward = t.info['final_eval_reward']
                         arrive_dest = t.info['arrive_dest']
                         seq_traj_len = t.info['seq_traj_len']
+                        seq_traj_len = int(seq_traj_len.numpy())
                         if arrive_dest:
                             z_success_times += 1
                         else:
