@@ -35,7 +35,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
     start_seed=0,
     use_render=False,
-    environment_num=5,
+    environment_num=10,
 
     # ===== Map Config =====
     map='SSSSSSSSSS',  # int or string: an easy way to fill map_config
@@ -83,12 +83,12 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Reward Scheme =====
     # See: https://github.com/decisionforce/metadrive/issues/283
     success_reward= 10.0, #10.0,
-    out_of_road_penalty= 5.0, #5.0,
-    crash_vehicle_penalty=5.0, #1.0,
+    out_of_road_penalty= 1.0, #5.0,
+    crash_vehicle_penalty=1.0, #1.0,
     crash_object_penalty=5.0, #5.0,
     run_out_of_time_penalty = 5.0, #5.0,
-    driving_reward=0.2,
-    speed_reward=0.1,
+    driving_reward=0.1,
+    speed_reward=0.2,
     heading_reward = 0.05, 
 
 
@@ -117,13 +117,14 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # Reward Option Scheme
     const_episode_max_step = False,
     episode_max_step = 150,
+    avg_speed = 6.5
 
     use_lateral=True,
     lateral_scale = 0.25, 
 
-    jerk_bias = 10.0, 
-    jerk_dominator = 10.0, #50.0
-    jerk_importance = 0.14, # 0.6
+    jerk_bias = 15.0, 
+    jerk_dominator = 45.0, #50.0
+    jerk_importance = 0.5, # 0.6
     use_speed_reward = True,
     use_heading_reward = False,
     use_jerk_reward = False,
@@ -201,6 +202,7 @@ class MetaDriveTrajEnv(BaseEnv):
         # self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
         self.vel_speed = 0.0
         self.z_state = np.zeros(6)
+        self.avg_speed = self.config["avg_speed"]
 
     # define a action type, and execution style
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
@@ -373,7 +375,7 @@ class MetaDriveTrajEnv(BaseEnv):
         if self._compute_navi_dist:
             self.navi_distance = self.get_navigation_len(vehicle)
             if not self.config['const_episode_max_step']:
-                self.episode_max_step = self.get_episode_max_step(self.navi_distance)
+                self.episode_max_step = self.get_episode_max_step(self.navi_distance, self.avg_speed)
             self._compute_navi_dist = False
         #self.update_current_state(vehicle)
         # Reward for moving forward in current lane
@@ -410,8 +412,8 @@ class MetaDriveTrajEnv(BaseEnv):
             speed_list = self.compute_speed_list(vehicle)
             for speed in speed_list: 
                 speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
-                if speed < 4:
-                    speed_reward -= 0.04
+                if speed < self.avg_speed:
+                    speed_reward -= 0.06
         if self.config["use_heading_reward"]:
             # Heading Reward
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
@@ -801,7 +803,7 @@ class MetaDriveTrajEnv(BaseEnv):
             angle_in_rad += 2 * np.pi
         return angle_in_rad
 
-    def get_episode_max_step(self, distance, average_speed = 7.0):
+    def get_episode_max_step(self, distance, average_speed = 6.5):
         average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
         max_step = int(distance / average_dist_per_step) + 1
         return max_step

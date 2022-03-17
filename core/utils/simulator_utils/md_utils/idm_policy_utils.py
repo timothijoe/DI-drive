@@ -6,7 +6,7 @@ class MacroIDMPolicy(IDMPolicy):
 
     def __init__(self, control_object, random_seed):
         super(MacroIDMPolicy, self).__init__(control_object=control_object, random_seed=random_seed)
-        self.NORMAL_SPEED_CONST = 25 #15
+        self.NORMAL_SPEED_CONST = 18 #15
         self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
         self.LANE_CHANGE_FREQ = 300
 
@@ -48,9 +48,19 @@ class MacroIDMPolicy(IDMPolicy):
         surrounding_objects = FrontBackObjects.get_find_front_back_objs(
             all_objects, self.routing_target_lane, self.control_object.position, self.MAX_LONG_DIST, current_lanes
         )
-        if not surrounding_objects.right_lane_exist():
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST -4.0
-        elif not surrounding_objects.left_lane_exist():
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 4.0
+        # if not surrounding_objects.right_lane_exist():
+        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST -4.0
+        # elif not surrounding_objects.left_lane_exist():
+        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 4.0
+        # else:
+        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 4 * (2 * np.random.rand() - 1)
+            
+        current_lane = self.control_object.lane
+        total_lane_num = len(current_lanes)
+        current_lane_idx = current_lane.index[-1]
+        if current_lane_idx == 0 or current_lane_idx == current_lane_idx-1:
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
+        elif current_lane_idx % 2 == 0:
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 2
         else:
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 4 * (2 * np.random.rand() - 1)
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST - 2
