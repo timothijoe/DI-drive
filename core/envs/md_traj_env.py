@@ -117,7 +117,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # Reward Option Scheme
     const_episode_max_step = False,
     episode_max_step = 150,
-    avg_speed = 6.5
+    avg_speed = 6.5,
 
     use_lateral=True,
     lateral_scale = 0.25, 
