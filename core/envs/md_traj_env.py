@@ -87,8 +87,8 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     crash_vehicle_penalty=5.0, #1.0,
     crash_object_penalty=5.0, #5.0,
     run_out_of_time_penalty = 5.0, #5.0,
-    driving_reward=0.1,
-    speed_reward=0.15,
+    driving_reward=0.2,
+    speed_reward=0.2,
     heading_reward = 0.05, 
 
 
