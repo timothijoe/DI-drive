@@ -16,7 +16,7 @@
      spec:
        containers:
        - name: di-container
-         image: opendilab/ding:nightly
+         image: registry.sensetime.com/xlab/ding:cuda-nightly-atari
          imagePullPolicy: Always  # IfNotPresent
          env:
          - name: PYTHONUNBUFFERED
