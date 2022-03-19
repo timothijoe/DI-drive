@@ -84,12 +84,12 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # See: https://github.com/decisionforce/metadrive/issues/283
     success_reward= 10.0, #10.0,
     out_of_road_penalty= 1.0, #5.0,
-    crash_vehicle_penalty=5.0, #1.0,
+    crash_vehicle_penalty=1.0, #1.0,
     crash_object_penalty=5.0, #5.0,
     run_out_of_time_penalty = 5.0, #5.0,
-    driving_reward=0.2,
+    driving_reward=0.1,
     speed_reward=0.2,
-    heading_reward = 0.05, 
+    heading_reward = 0.15, 
 
 
     # ===== Cost Scheme =====
@@ -124,7 +124,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     jerk_bias = 15.0, 
     jerk_dominator = 45.0, #50.0
-    jerk_importance = 0.8, # 0.6
+    jerk_importance = 0.6, # 0.6
     use_speed_reward = True,
     use_heading_reward = False,
     use_jerk_reward = False,
@@ -413,7 +413,7 @@ class MetaDriveTrajEnv(BaseEnv):
             for speed in speed_list: 
                 speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
                 if speed < self.avg_speed:
-                    speed_reward -= 0.04
+                    speed_reward -= 0.06
         if self.config["use_heading_reward"]:
             # Heading Reward
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
