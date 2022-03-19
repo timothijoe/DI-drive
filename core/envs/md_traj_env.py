@@ -89,7 +89,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     run_out_of_time_penalty = 5.0, #5.0,
     driving_reward=0.1,
     speed_reward=0.2,
-    heading_reward = 0.15, 
+    heading_reward = 0.3, 
 
 
     # ===== Cost Scheme =====
