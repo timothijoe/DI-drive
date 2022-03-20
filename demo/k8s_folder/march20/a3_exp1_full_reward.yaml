@@ -39,7 +39,7 @@
            pip install -e .
            cd /mnt/nfs/zhoutong/lattern/xad
            pip install -e .
-           python3 -u /mnt/nfs/zhoutong/lattern/xad/demo/train_k8s/march19/a3_exp1_full_reward.py
+           python3 -u /mnt/nfs/zhoutong/lattern/xad/demo/train_k8s/march20/a3_exp1_full_reward.py
            # python3 -u /mnt/nfs/zhoutong/lattern/xad/demo/train_k8s/march18/a4_exp1_static_alpha.py
          volumeMounts:
          - name: work-dir
