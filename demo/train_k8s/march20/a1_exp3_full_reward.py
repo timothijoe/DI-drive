@@ -24,20 +24,21 @@ elif TRAJ_CONTROL_MODE == 'jerk':
 else:
     VAE_LOAD_DIR = None
 metadrive_basic_config = dict(
-    exp_name = 'a1_exp3_full_reward',
+    exp_name = 'b1_exp3_full_reward',
     env=dict(
         metadrive=dict(use_render=False,
             show_seq_traj = False,
-            traffic_density = 0.3,
+            traffic_density = 0.4,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
             #map='XSXS',
             #show_interface=False,
-            use_lateral=True,
+            use_lateral=False,
             use_speed_reward = True,
             use_heading_reward = True,
             use_jerk_reward = True,
+            heading_reward=0.2,
         ),
         manager=dict(
             shared_memory=False,
