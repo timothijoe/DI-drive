@@ -18,9 +18,12 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 10
+SEQ_TRAJ_LEN = 15
 if TRAJ_CONTROL_MODE == 'acc':
-    VAE_LOAD_DIR = 'ckpt_files/seq_len_10_decoder_ckpt'
+    if SEQ_TRAJ_LEN == 10:
+        VAE_LOAD_DIR = 'traj_model/seq_len_10_decoder_ckpt'
+    elif SEQ_TRAJ_LEN == 15:
+        VAE_LOAD_DIR = 'traj_model/seq_len_15_decoder_ckpt'
 elif TRAJ_CONTROL_MODE == 'jerk': 
     VAE_LOAD_DIR = 'ckpt_files/new_jerk_decoder_ckpt'
 else:
@@ -30,7 +33,7 @@ metadrive_basic_config = dict(
     env=dict(
         metadrive=dict(use_render=True,
             show_seq_traj = True,
-            traffic_density = 0.35,
+            traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
@@ -115,12 +118,17 @@ def main(cfg):
     model = ConvQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
 
+
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
     #collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
     
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/a1_exp3/iteration_70000.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
+    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/acc_full_reward/iteration_50000.pth.tar', map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))
