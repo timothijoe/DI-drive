@@ -31,6 +31,8 @@ elif TRAJ_CONTROL_MODE == 'jerk':
     VAE_LOAD_DIR = 'ckpt_files/new_jerk_decoder_ckpt'
 else:
     VAE_LOAD_DIR = None
+
+PRETRAINED_MODEL = 'traj_model/pre_train_demo_len_10.pth.tar' 
 metadrive_basic_config = dict(
     exp_name = 'zc4_exp3_len20_with_pretrain',
     env=dict(
@@ -72,6 +74,7 @@ metadrive_basic_config = dict(
             update_per_collect=100,
             batch_size=64,
             learning_rate=3e-4,
+            learner=dict(hook=dict(load_ckpt_before_run=PRETRAINED_MODEL,),),
         ),
         collect=dict(
             n_sample=5000,
@@ -119,9 +122,9 @@ def main(cfg):
 
     model = ConvQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
-    if PRE_TRAINED:
-        dir = 'traj_model/pre_train_demo_len_10.pth.tar'
-        policy._load_state_dict_collect(torch.load(dir))
+    # if PRE_TRAINED:
+    #     dir = 'traj_model/pre_train_demo_len_10.pth.tar'
+    #     policy._load_state_dict_collect(torch.load(dir))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
     collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
