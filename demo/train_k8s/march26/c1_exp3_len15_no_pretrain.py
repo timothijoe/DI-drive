@@ -119,7 +119,8 @@ def main(cfg):
     model = ConvQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
     if PRE_TRAINED:
-        dir = 'traj_model/pre_train_demo_len_10.tar'
+        import torch
+        dir = 'traj_model/pre_train_demo_len_10.pth.tar'
         policy._load_state_dict_collect(torch.load(dir))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
