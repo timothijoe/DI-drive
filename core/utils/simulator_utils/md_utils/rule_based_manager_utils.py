@@ -1,12 +1,11 @@
 from metadrive.manager.agent_manager import AgentManager
 from core.utils.simulator_utils.md_utils.macro_policy import ManualMacroDiscretePolicy
-from core.utils.simulator_utils.md_utils.discrete_policy_macro import DiscreteMacroPolicy
 from core.utils.simulator_utils.md_utils.vehicle_utils import MacroDefaultVehicle
 from metadrive.utils.space import ParameterSpace, VehicleParameterSpace
 from metadrive.component.vehicle.vehicle_type import DefaultVehicle
 from metadrive.utils import Config, safe_clip_for_small_array
 from typing import Union, Dict, AnyStr, Tuple
-
+from core.utils.simulator_utils.md_utils.idm_policy_utils import MacroIDMPolicy
 
 # class MacroDefaultVehicle(DefaultVehicle):
 
@@ -24,25 +23,20 @@ from typing import Union, Dict, AnyStr, Tuple
 #         return
 
 
-class MacroAgentManager(AgentManager):
+class ExpertIDMPolicy(AgentManager):
 
     def _get_policy(self, obj):
-        policy = DiscreteMacroPolicy(obj, self.generate_seed())
+        policy = MacroIDMPolicy(obj, self.generate_seed(), 30,5)
         return policy
-    def before_step(self, external_actions=None):
+    def before_step(self, frame = 0, wps=None):
         # not in replay mode
         self._agents_finished_this_frame = dict()
         step_infos = {}
         for agent_id in self.active_agents.keys():
             policy = self.engine.get_policy(self._agent_to_object[agent_id])
-            macro_action = None
-            if external_actions is not None and agent_id in external_actions.keys():
-                macro_action = external_actions[agent_id]
-            action = policy.act(agent_id, macro_action)
-            #action = policy.act(agent_id, external_actions)
+            action = policy.act(agent_id)
             step_infos[agent_id] = policy.get_action_info()
             step_infos[agent_id].update(self.get_agent(agent_id).before_step(action))
-            self.get_agent(agent_id).before_macro_step(macro_action)
             
 
         finished = set()

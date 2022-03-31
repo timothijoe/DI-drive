@@ -7,7 +7,7 @@ from typing import Callable, Optional, Union, List, Dict, AnyStr
 
 class MacroBaseEngine(BaseEngine):
 
-    def before_step_macro(self, frame = 0, wps=None) -> Dict:
+    def before_step_macro(self, actions=None) -> Dict:
         """
         Update states after finishing movement
         :return: if this episode is done
@@ -15,7 +15,7 @@ class MacroBaseEngine(BaseEngine):
         step_infos = {}
         for manager in self._managers.values():
             if (manager.__class__.__name__ == 'MacroAgentManager'):
-                step_infos.update(manager.before_step(frame, wps))
+                step_infos.update(manager.before_step(actions))
             else:
                 step_infos.update(manager.before_step())
         return step_infos
