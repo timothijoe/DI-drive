@@ -9,7 +9,7 @@ class MacroIDMPolicy(IDMPolicy):
         #self.NORMAL_SPEED_CONST = 18 #15
         self.NORMAL_SPEED_CONST = normal_speed
         self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
-        self.LANE_CHANGE_FREQ = 300 #300
+        self.LANE_CHANGE_FREQ = 600 #300
         self.SAFE_LANE_CHANGE_DISTANCE = safe_lane_change_dist
 
     def act(self, *args, **kwargs):
@@ -50,19 +50,19 @@ class MacroIDMPolicy(IDMPolicy):
         surrounding_objects = FrontBackObjects.get_find_front_back_objs(
             all_objects, self.routing_target_lane, self.control_object.position, self.MAX_LONG_DIST, current_lanes
         )
-        # if not surrounding_objects.right_lane_exist():
-        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST -4.0
-        # elif not surrounding_objects.left_lane_exist():
-        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 4.0
-        # else:
-        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 4 * (2 * np.random.rand() - 1)
-            
-        current_lane = self.control_object.lane
-        total_lane_num = len(current_lanes)
-        current_lane_idx = current_lane.index[-1]
-        if current_lane_idx == 0 or current_lane_idx == current_lane_idx-1:
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
-        elif current_lane_idx % 2 == 0:
+        if not surrounding_objects.right_lane_exist():
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST - 10
+        elif not surrounding_objects.left_lane_exist():
             self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 10
         else:
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST - 10
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
+            
+        # current_lane = self.control_object.lane
+        # total_lane_num = len(current_lanes)
+        # current_lane_idx = current_lane.index[-1]
+        # if current_lane_idx == 0 or current_lane_idx == current_lane_idx-1:
+        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
+        # elif current_lane_idx % 2 == 0:
+        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 5
+        # else:
+        #     self.NORMAL_SPEED = self.NORMAL_SPEED_CONST - 5

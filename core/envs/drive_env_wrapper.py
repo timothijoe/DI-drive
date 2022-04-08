@@ -117,7 +117,7 @@ class DriveEnvWrapper(gym.Wrapper):
         rew = to_ndarray([rew], dtype=np.float32)
         if done:
             info['final_eval_reward'] = self._final_eval_reward
-            info['complete_ratio'] = info['complete_ratio']
+            #info['complete_ratio'] = info['complete_ratio']
             #print('seq traj len: {}'.format(info['seq_traj_len']))
 
         return BaseEnvTimestep(obs, rew, done, info)

@@ -9,13 +9,13 @@ from typing import Union, Dict, AnyStr, Tuple, Optional
 from gym.envs.registration import register
 import logging
 
-from ding.utils import ENV_REGISTRY
 from core.utils.simulator_utils.md_utils.discrete_policy import DiscreteMetaAction
-from core.utils.simulator_utils.md_utils.agent_manager_utils import ExpertAgentManager
+from core.utils.simulator_utils.md_utils.agent_manager_utils import MacroAgentManager
+from core.utils.simulator_utils.md_utils.rule_based_manager_utils import ExpertIDMPolicy
 from core.utils.simulator_utils.md_utils.engine_utils import initialize_engine, close_engine, \
     engine_initialized, set_global_random_seed, MacroBaseEngine
 from core.utils.simulator_utils.md_utils.traffic_manager_utils import TrafficMode
-
+from metadrive.constants import RENDER_MODE_NONE, DEFAULT_AGENT, REPLAY_DONE
 from metadrive.envs.base_env import BaseEnv
 from metadrive.component.map.base_map import BaseMap
 from metadrive.component.map.pg_map import parse_map_config, MapGenerateMethod
@@ -24,15 +24,19 @@ from metadrive.component.pgblock.first_block import FirstPGBlock
 from metadrive.constants import DEFAULT_AGENT, TerminationState
 from metadrive.component.vehicle.base_vehicle import BaseVehicle
 from metadrive.utils import Config, merge_dicts, get_np_random, clip
-
+from metadrive.utils import Config, merge_dicts, get_np_random, concat_step_infos
 from metadrive.envs.base_env import BASE_DEFAULT_CONFIG
 from metadrive.obs.top_down_obs_multi_channel import TopDownMultiChannel
+from metadrive.utils.utils import auto_termination
+from core.policy.ad_policy.traj_vae import VaeDecoder
+import torch
+from metadrive.component.road_network import Road
 
 DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
     start_seed=0,
     use_render=False,
-    environment_num=1,
+    environment_num=10,
 
     # ===== Map Config =====
     map='SSSSSSSSSS',  # int or string: an easy way to fill map_config
@@ -47,7 +51,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     },
 
     # ===== Traffic =====
-    traffic_density=0.15,
+    traffic_density=0.2,
     on_screen=False,
     rgb_clip=True,
     need_inverse_traffic=False,
@@ -77,19 +81,17 @@ DIDRIVE_DEFAULT_CONFIG = dict(
         DEFAULT_AGENT: dict(use_special_color=True, spawn_lane_index=(FirstPGBlock.NODE_1, FirstPGBlock.NODE_2, 2))
     },
 
-    seq_traj_len = 1,
-    show_seq_traj = False,
-
     # ===== Reward Scheme =====
     # See: https://github.com/decisionforce/metadrive/issues/283
-    success_reward=10.0,
-    out_of_road_penalty=5.0,
-    crash_vehicle_penalty=1.0,
-    crash_object_penalty=5.0,
-    driving_reward=0.1,
-    speed_reward=0.5,
-    heading_reward = 0.1,
-    use_lateral=False,
+    success_reward= 10.0, #10.0,
+    out_of_road_penalty= 1.0, #5.0,
+    crash_vehicle_penalty=1.0, #1.0,
+    crash_object_penalty=5.0, #5.0,
+    run_out_of_time_penalty = 5.0, #5.0,
+    driving_reward=1.0,
+    speed_reward=0.1,
+    heading_reward = 0.3, 
+
 
     # ===== Cost Scheme =====
     crash_vehicle_cost=1.0,
@@ -99,23 +101,38 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Termination Scheme =====
     out_of_route_done=True,
     physics_world_step_size=3e-2,
+
+    # ===== Trajectory length =====
+    seq_traj_len = 10,
+    show_seq_traj = False,
+    #episode_max_step = 100,
+
+    
+
+
+    #traj_control_mode = 'acc', # another type is 'jerk'
+    traj_control_mode = 'macro',
+    # if we choose traj_control_mode = 'acc', then the current state is [0,0,0,v] and the control signal is throttle and steer
+    # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
+    
+    # Reward Option Scheme
+    const_episode_max_step = False,
+    episode_max_step = 1500,
+    avg_speed = 13.0,
+
+    use_lateral=True,
+    lateral_scale = 0.25, 
+
+    jerk_bias = 15.0, 
+    jerk_dominator = 45.0, #50.0
+    jerk_importance = 0.6, # 0.6
+    use_speed_reward = True,
+    use_heading_reward = False,
+    use_jerk_reward = False,
 )
 
 
-@ENV_REGISTRY.register("md_macro")
-class MetaDriveExpertEnv(BaseEnv):
-    """
-    MetaDrive single-agent env controlled by a "macro" action. The agent is controlled by
-    a discrete action set. Each one related to a series of control signals that can complish
-    the macro action defined in the set. The observation is a top-down view image with 5 channel
-    containing the temporary and history information of surroundings. This env is registered
-    and can be used via `gym.make`.
-
-    :Arguments:
-        - config (Dict): Env config dict.
-
-    :Interfaces: reset, step, close, render, seed
-    """
+class MetaDriveImitationEnv(BaseEnv):
 
     @classmethod
     def default_config(cls) -> "Config":
@@ -126,7 +143,7 @@ class MetaDriveExpertEnv(BaseEnv):
         config["map_config"].register_type("config", None)
         return config
 
-    def __init__(self, config: dict = None) -> None:
+    def __init__(self, config: dict = None):
         merged_config = self._merge_extra_config(config)
         global_config = self._post_process_config(merged_config)
         self.config = global_config
@@ -139,9 +156,12 @@ class MetaDriveExpertEnv(BaseEnv):
         assert isinstance(self.num_agents, int) and (self.num_agents > 0 or self.num_agents == -1)
 
         # observation and action space
-        self.agent_manager = ExpertAgentManager(
+        self.agent_manager = MacroAgentManager(
             init_observations=self._get_observations(), init_action_space=self._get_action_space()
         )
+        # self.agent_manager = ExpertIDMPolicy(
+        #     init_observations=self._get_observations(), init_action_space=self._get_action_space()
+        # )
         self.action_type = DiscreteMetaAction()
         #self.action_space = self.action_type.space()
 
@@ -160,14 +180,69 @@ class MetaDriveExpertEnv(BaseEnv):
         self.env_num = self.config["environment_num"]
 
         self.time = 0
+        self.step_num = 0
+        self.episode_rwd = 0
+        self.vel_speed = 0.0
+        self.z_state = np.zeros(6)
+        self.avg_speed = self.config["avg_speed"]
+
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
         self.episode_steps += 1
-        macro_actions = self._preprocess_macro_actions(actions)
-        step_infos = self._step_macro_simulator(macro_actions)
+        actions = self._preprocess_actions(actions)
+        #print('actions: {}'.format(actions))
+        step_infos = self._step_simulator(actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
+        self.step_num = self.step_num + 1
+        self.episode_rwd = self.episode_rwd + r 
+        #print('step number is: {}'.format(self.step_num))
         #o = o.transpose((2,0,1))
         return o, r, d, i
+
+    def _preprocess_actions(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]) \
+            -> Union[np.ndarray, Dict[AnyStr, np.ndarray]]:
+        if not self.is_multi_agent:
+            actions = {v_id: actions for v_id in self.vehicles.keys()}
+        else:
+            if self.config["vehicle_config"]["action_check"]:
+                # Check whether some actions are not provided.
+                given_keys = set(actions.keys())
+                have_keys = set(self.vehicles.keys())
+                assert given_keys == have_keys, "The input actions: {} have incompatible keys with existing {}!".format(
+                    given_keys, have_keys
+                )
+            else:
+                # That would be OK if extra actions is given. This is because, when evaluate a policy with naive
+                # implementation, the "termination observation" will still be given in T=t-1. And at T=t, when you
+                # collect action from policy(last_obs) without masking, then the action for "termination observation"
+                # will still be computed. We just filter it out here.
+                actions = {v_id: actions[v_id] for v_id in self.vehicles.keys()}
+        return actions
+
+    def _step_simulator(self, actions):
+        # Note that we use shallow update for info dict in this function! This will accelerate system.
+        scene_manager_before_step_infos = self.engine.before_step(actions)
+        # step all entities
+        self.engine.step(1)
+        # update states, if restore from episode data, position and heading will be force set in update_state() function
+        scene_manager_after_step_infos = self.engine.after_step()
+        return merge_dicts(
+            scene_manager_after_step_infos, scene_manager_before_step_infos, allow_new_keys=True, without_copy=True
+        )
+
+
+
+
+
+    def get_waypoint_list(self):
+        x = np.arange(0, 6.2, 0.2)
+        LENGTH = 0 # 4.51
+        y = 1 * np.cos(np.pi*2 / 6.0 * x)-1
+        x = x + LENGTH/2
+        lst = []
+        for i in range(x.shape[0]):
+            lst.append([x[i],y[i]])
+        return lst
 
     def _merge_extra_config(self, config: Union[dict, "Config"]) -> "Config":
         config = self.default_config().update(config, allow_add_new_key=True)
@@ -176,7 +251,7 @@ class MetaDriveExpertEnv(BaseEnv):
         return config
 
     def _post_process_config(self, config):
-        config = super(MetaDriveExpertEnv, self)._post_process_config(config)
+        config = super(MetaDriveImitationEnv, self)._post_process_config(config)
         if not config["rgb_clip"]:
             logging.warning(
                 "You have set rgb_clip = False, which means the observation will be uint8 values in [0, 255]. "
@@ -244,6 +319,10 @@ class MetaDriveExpertEnv(BaseEnv):
             done = True
             done_info[TerminationState.CRASH_BUILDING] = True
             logging.info("Episode ended! Reason: crash building ")
+        if self.step_num >= self.episode_max_step:
+            done = True
+            done_info[TerminationState.CRASH_BUILDING] = True
+            logging.info("Episode ended! Reason: crash building ")
 
         # for compatibility
         # crash almost equals to crashing with vehicles
@@ -251,6 +330,9 @@ class MetaDriveExpertEnv(BaseEnv):
             done_info[TerminationState.CRASH_VEHICLE] or done_info[TerminationState.CRASH_OBJECT]
             or done_info[TerminationState.CRASH_BUILDING]
         )
+        done_info['complete_ratio'] = clip(self.already_go_dist/ self.navi_distance + 0.05, 0.0, 1.0)
+        done_info['seq_traj_len'] = self.config['seq_traj_len']
+
         return done, done_info
 
     def cost_function(self, vehicle_id: str):
@@ -263,6 +345,8 @@ class MetaDriveExpertEnv(BaseEnv):
             step_info["cost"] = self.config["crash_vehicle_cost"]
         elif vehicle.crash_object:
             step_info["cost"] = self.config["crash_object_cost"]
+        elif self.step_num > self.config["episode_max_step"]:
+            step_info['cost'] = 1
         return step_info['cost'], step_info
 
     def _is_out_of_road(self, vehicle):
@@ -273,7 +357,6 @@ class MetaDriveExpertEnv(BaseEnv):
         if self.config["out_of_route_done"]:
             ret = ret or vehicle.out_of_route
         return ret
-
     def reward_function(self, vehicle_id: str):
         """
         Override this func to get a new reward function
@@ -301,29 +384,116 @@ class MetaDriveExpertEnv(BaseEnv):
             lateral_factor = 1.0
 
         reward = 0.0
-        lateral_factor *= 0.2
-        reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
-        reward += self.config["speed_reward"] * (vehicle.speed / vehicle.max_speed) * positive_road
-        #print('vel speed: {}'.format(vehicle.speed))
-        speed_rwd = -0.6 if vehicle.speed < 60 else 0
-        reward += speed_rwd
+        # lateral_factor *= 0.02
+        # reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
+        # reward += self.config["speed_reward"] * (vehicle.speed / vehicle.max_speed) * positive_road
+        # #print('vel speed: {}'.format(vehicle.speed))
+        # speed_rwd = -0.3 if vehicle.speed < 60 else 0
+        # reward += speed_rwd
 
         step_info["step_reward"] = reward
-        print(reward)
 
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
         elif vehicle.macro_succ:
             reward = +self.config["success_reward"]
-        elif self._is_out_of_road(vehicle):
-            reward = -self.config["out_of_road_penalty"]
-        elif vehicle.crash_vehicle:
-            reward = -self.config["crash_vehicle_penalty"]
-        elif vehicle.macro_crash:
-            reward = -self.config["crash_vehicle_penalty"]
-        elif vehicle.crash_object:
-            reward = -self.config["crash_object_penalty"]
+        # elif self._is_out_of_road(vehicle):
+        #     reward = -self.config["out_of_road_penalty"]
+        # elif vehicle.crash_vehicle:
+        #     reward = -self.config["crash_vehicle_penalty"]
+        # elif vehicle.macro_crash:
+        #     reward = -self.config["crash_vehicle_penalty"]
+        # elif vehicle.crash_object:
+        #     reward = -self.config["crash_object_penalty"]
         return reward, step_info
+    
+    def get_navigation_len(self, vehicle):
+        checkpoints = vehicle.navigation.checkpoints
+        road_network = vehicle.navigation.map.road_network
+        total_dist = 0
+        assert len(checkpoints) >=2
+        for check_num in range(0, len(checkpoints)-1):
+            front_node = checkpoints[check_num]
+            end_node = checkpoints[check_num+1] 
+            cur_lanes = road_network.graph[front_node][end_node]
+            target_lane_num = int(len(cur_lanes) / 2)
+            target_lane = cur_lanes[target_lane_num]
+            target_lane_length = target_lane.length
+            total_dist += target_lane_length 
+        return total_dist
+            
+    def compute_jerk_list(self, vehicle):
+        jerk_list = []
+        #vehicle = self.vehicles[vehicle_id]
+        v_t0 = vehicle.penultimate_state['speed']
+        theta_t0 = vehicle.penultimate_state['yaw']
+        v_t1 = vehicle.traj_wp_list[0]['speed']
+        theta_t1 = vehicle.traj_wp_list[0]['yaw']
+        v_t2 = vehicle.traj_wp_list[1]['speed']
+        theta_t2 = vehicle.traj_wp_list[1]['yaw']
+        t_inverse = 1.0 / self.config['physics_world_step_size']
+        first_point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) +  v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+        first_point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) +  v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
+        jerk_list.append(np.array([first_point_jerk_x, first_point_jerk_y]))
+        # plus one because we store the current value as first, which means the whole trajectory is seq_traj_len + 1
+        for i in range(2, self.config['seq_traj_len'] + 1):
+            v_t0 = vehicle.traj_wp_list[i-2]['speed']
+            theta_t0 = vehicle.traj_wp_list[i-2]['yaw']
+            v_t1 = vehicle.traj_wp_list[i-1]['speed']
+            theta_t1 = vehicle.traj_wp_list[i-1]['yaw']
+            v_t2 = vehicle.traj_wp_list[i]['speed']
+            theta_t2 = vehicle.traj_wp_list[i]['yaw']    
+            point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+            point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
+            jerk_list.append(np.array([point_jerk_x, point_jerk_y]))
+        #final_jerk_value = 0
+        step_jerk_list = []
+        for jerk in jerk_list:
+            #final_jerk_value += np.linalg.norm(jerk)
+            step_jerk_list.append(np.linalg.norm(jerk))
+        return step_jerk_list
+
+    def update_current_state(self, vehicle_id):
+        vehicle = self.vehicles[vehicle_id]
+        t_inverse = 1.0 / self.config['physics_world_step_size']
+        theta_t1 = vehicle.traj_wp_list[-2]['yaw']
+        theta_t2 = vehicle.traj_wp_list[-1]['yaw']
+        v_t1 = vehicle.traj_wp_list[-2]['speed']
+        v_t2 = vehicle.traj_wp_list[-1]['speed']
+        v_state = np.zeros(6)
+        v_state[3] = v_t2
+        v_state[4] = (v_t2 - v_t1) * t_inverse 
+        theta_dot = (theta_t2 - theta_t1) * t_inverse
+        v_state[5] = np.arctan(2.5 * theta_dot / v_t2) if v_t2 > 0.001 else 0.0
+        self.z_state = v_state
+
+    def compute_heading_error_list(self, vehicle, lane):
+        heading_error_list = []
+        for i in range(1, self.config['seq_traj_len'] + 1):
+            theta = vehicle.traj_wp_list[i]['yaw'] 
+            long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
+            road_heading_theta = lane.heading_theta_at(long_now)
+            theta_error = self.wrap_angle(theta - road_heading_theta)
+            heading_error_list.append(np.abs(theta_error))
+        return heading_error_list
+
+    def compute_speed_list(self, vehicle):
+        speed_list = []
+        for i in range(1, self.config['seq_traj_len'] + 1):
+            speed = vehicle.traj_wp_list[i]['speed']
+            speed_list.append(speed)
+        return speed_list
+
+    def compute_avg_lateral_cum(self, vehicle, lane):
+        # Compute lateral distance for each wp
+        # average the factor by seq traj len
+        # For example, if traj len is 10, then i = 1, 2, ... 10
+        lateral_cum = 0
+        for i in range(1, self.config['seq_traj_len'] + 1):
+            long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
+            lateral_cum += np.abs(lateral_now)
+        avg_lateral_cum = lateral_cum / float(self.config['seq_traj_len'])
+        return avg_lateral_cum
 
     def switch_to_third_person_view(self) -> None:
         if self.main_camera is None:
@@ -349,8 +519,73 @@ class MetaDriveExpertEnv(BaseEnv):
     def switch_to_top_down_view(self):
         self.main_camera.stop_track()
 
+    def _get_step_return(self, actions, engine_info):
+        # update obs, dones, rewards, costs, calculate done at first !
+        obses = {}
+        done_infos = {}
+        cost_infos = {}
+        reward_infos = {}
+        rewards = {}
+        for v_id, v in self.vehicles.items():
+            o = self.observations[v_id].observe(v)
+            self.update_current_state(v_id)
+            self.vel_speed = v.last_spd
+            if self.config["traj_control_mode"] == 'jerk':
+                o_dict = {}
+                o_dict['birdview'] = o 
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state
+                o_dict['vehicle_state'] = v_state
+                #o_dict['speed'] = v.last_spd
+            elif self.config["traj_control_mode"] == 'acc':
+                o_dict = {}
+                o_dict['birdview'] = o 
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state[:4]
+                o_dict['vehicle_state'] = v_state
+                #o_dict['speed'] = v.last_spd
+            else:
+                o_dict = o
+            obses[v_id] = o_dict
+
+            done_function_result, done_infos[v_id] = self.done_function(v_id)
+            rewards[v_id], reward_infos[v_id] = self.reward_function(v_id)
+            _, cost_infos[v_id] = self.cost_function(v_id)
+            done = done_function_result or self.dones[v_id]
+            self.dones[v_id] = done
+
+        should_done = engine_info.get(REPLAY_DONE, False
+                                      ) or (self.config["horizon"] and self.episode_steps >= self.config["horizon"])
+        termination_infos = self.for_each_vehicle(auto_termination, should_done)
+
+        step_infos = concat_step_infos([
+            engine_info,
+            done_infos,
+            reward_infos,
+            cost_infos,
+            termination_infos,
+        ])
+
+        if should_done:
+            for k in self.dones:
+                self.dones[k] = True
+
+        dones = {k: self.dones[k] for k in self.vehicles.keys()}
+        for v_id, r in rewards.items():
+            self.episode_rewards[v_id] += r
+            step_infos[v_id]["episode_reward"] = self.episode_rewards[v_id]
+            self.episode_lengths[v_id] += 1
+            step_infos[v_id]["episode_length"] = self.episode_lengths[v_id]
+        if not self.is_multi_agent:
+            return self._wrap_as_single_agent(obses), self._wrap_as_single_agent(rewards), \
+                   self._wrap_as_single_agent(dones), self._wrap_as_single_agent(step_infos)
+        else:
+            return obses, rewards, dones, step_infos
+
     def setup_engine(self):
-        super(MetaDriveExpertEnv, self).setup_engine()
+        super(MetaDriveImitationEnv, self).setup_engine()
         self.engine.accept("b", self.switch_to_top_down_view)
         self.engine.accept("q", self.switch_to_third_person_view)
         from core.utils.simulator_utils.md_utils.traffic_manager_utils import MacroTrafficManager
@@ -386,72 +621,95 @@ class MetaDriveExpertEnv(BaseEnv):
                 actions = {v_id: actions[v_id] for v_id in self.vehicles.keys()}
         return actions
 
+    def _preprocess_macro_waypoints(self, waypoint_list: Union[np.ndarray, Dict[AnyStr, np.ndarray]]) \
+            -> Union[np.ndarray, Dict[AnyStr, np.ndarray]]:
+        if not self.is_multi_agent:
+            # print('action.dtype: {}'.format(type(actions)))
+            #print('action: {}'.format(actions))
+            actions = waypoint_list
+            actions = {v_id: actions for v_id in self.vehicles.keys()}
+        return actions
+
     def _step_macro_simulator(self, actions):
-        simulation_frequency = 30  # 60 80
+        simulation_frequency = 20  # 60 80
         policy_frequency = 1
         frames = int(simulation_frequency / policy_frequency)
         self.time = 0
-        #print('di action pairs: {}'.format(actions))
         actions = {vid: self.action_type.actions[vvalue] for vid, vvalue in actions.items()}
+
         for frame in range(frames):
-            #print('zt-------------zt')
-            #print(len(self.vehicles.items()))
             assert len(self.vehicles.items()) == 1
             onestep_o = np.zeros((200, 200, 5))
             for v_id, v in self.vehicles.items():
                 onestep_o = self.observations[v_id].observe(v)
-            #o = np.shape 
             if self.time % int(simulation_frequency / policy_frequency) == 0:
                 scene_manager_before_step_infos = self.engine.before_step_macro(actions)
-                self.engine.step()
-                #scene_manager_after_step_infos = self.engine.after_step()
             else:
                 scene_manager_before_step_infos = self.engine.before_step_macro()
                 self.engine.step()
             onestep_a = scene_manager_before_step_infos['default_agent']['raw_action']
             scene_manager_after_step_infos = self.engine.after_step()
             self.time += 1
-        #scene_manager_after_step_infos = self.engine.after_step()
         return merge_dicts(
             scene_manager_after_step_infos, scene_manager_before_step_infos, allow_new_keys=True, without_copy=True
         )
-
-    @property
-    def action_space(self) -> gym.Space:
-        """
-        Return observation spaces of active and controllable vehicles
-        :return: Dict
-        """
-        return self.action_type.space()
 
     def _get_reset_return(self):
         ret = {}
         self.engine.after_step()
         o = None
+        o_reset = None
+        #print('episode reward: {}'.format(self.episode_rwd))
+        self.episode_rwd = 0
+        self.step_num = 0
         for v_id, v in self.vehicles.items():
             self.observations[v_id].reset(self, v)
             ret[v_id] = self.observations[v_id].observe(v)
             o = self.observations[v_id].observe(v)
+            self.update_current_state(v_id)
+            self.vel_speed = 0
+            if self.config["traj_control_mode"] == 'jerk':
+                o_dict = {}
+                o_dict['birdview'] = o 
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state
+                o_dict['vehicle_state'] = v_state
+                #o_dict['speed'] = v.last_spd
+            elif self.config["traj_control_mode"] == 'acc':
+                o_dict = {}
+                o_dict['birdview'] = o 
+                # v_state = np.zeros(4)
+                # v_state[3] = v.last_spd
+                v_state = self.z_state[:4]
+                o_dict['vehicle_state'] = v_state
+                #o_dict['speed'] = v.last_spd
+            else:
+                o_dict = o
+            o_reset = o_dict
             if hasattr(v, 'macro_succ'):
                 v.macro_succ = False
             if hasattr(v, 'macro_crash'):
                 v.macro_crash = False
-        # zt_obs = zt_obs.transpose((2,0,1))
-        # print('process: {}  --- > initializing: a new episode begins'.format(os.getpid()))
+            v.penultimate_state = {}
+            v.penultimate_state['position'] = np.array([0,0])
+            v.penultimate_state['yaw'] = 0 
+            v.penultimate_state['speed'] = 0
+            v.traj_wp_list = [] 
+            v.traj_wp_list.append(copy.deepcopy(v.penultimate_state))
+            v.traj_wp_list.append(copy.deepcopy(v.penultimate_state))
+            v.last_spd = 0
+
+        self.already_go_dist = 0
+        self._compute_navi_dist = True 
+        self.navi_distance = 100.0
         self.remove_init_stop = True
+        self.episode_max_step = self.config['episode_max_step']
         if self.remove_init_stop:
-            return o
-        for i in range(8):
+            return o_reset
+        for i in range(4):
             o, r, d, info = self.step(self.action_type.actions_indexes["Holdon"])
-        for v_id, v in self.vehicles.items():
-            if hasattr(v, 'macro_succ'):
-                p = self.engine.get_policy(v.name)
-                target_speed = p.NORMAL_SPEED * 0.1
-                v.set_velocity(v.heading, target_speed)
-        for i in range(1):
-            o, r, d, info = self.step(self.action_type.actions_indexes["IDLE"])
-            o = o
-        return o
+        return o_reset
 
     def lazy_init(self):
         """
@@ -480,3 +738,21 @@ class MetaDriveExpertEnv(BaseEnv):
         )
         #o = TopDownMultiChannel(vehicle_config, self, False)
         return o
+    
+    def wrap_angle(self, angle_in_rad):
+        #angle_in_rad = angle_in_degree / 180.0 * np.pi
+        while (angle_in_rad > np.pi):
+            angle_in_rad -= 2 * np.pi
+        while (angle_in_rad <= -np.pi):
+            angle_in_rad += 2 * np.pi
+        return angle_in_rad
+
+    def get_episode_max_step(self, distance, average_speed = 13):
+        average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
+        max_step = int(distance / average_dist_per_step) + 1
+        return max_step
+
+register(
+    id='HRL-v2',
+    entry_point='core.envs.md_imitation_env:MetaDriveImitationEnv',
+)
