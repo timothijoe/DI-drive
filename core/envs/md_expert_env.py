@@ -47,7 +47,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     },
 
     # ===== Traffic =====
-    traffic_density=0.15,
+    traffic_density=0.3,
     on_screen=False,
     rgb_clip=True,
     need_inverse_traffic=False,
@@ -90,6 +90,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     speed_reward=0.5,
     heading_reward = 0.1,
     use_lateral=False,
+    episode_max_step = 150,
 
     # ===== Cost Scheme =====
     crash_vehicle_cost=1.0,
@@ -98,7 +99,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # ===== Termination Scheme =====
     out_of_route_done=True,
-    physics_world_step_size=3e-2,
+    physics_world_step_size= 5e-2, #3e-2,
 )
 
 
@@ -155,17 +156,21 @@ class MetaDriveExpertEnv(BaseEnv):
         self.dones = None
         self.episode_rewards = defaultdict(float)
         self.episode_lengths = defaultdict(int)
+        
 
         self.start_seed = self.config["start_seed"]
         self.env_num = self.config["environment_num"]
 
         self.time = 0
+        self.step_num = 0
+        self.episode_max_step = self.config["episode_max_step"]
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
         self.episode_steps += 1
         macro_actions = self._preprocess_macro_actions(actions)
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
+        self.step_num = self.step_num + 1
         #o = o.transpose((2,0,1))
         return o, r, d, i
 
@@ -244,7 +249,10 @@ class MetaDriveExpertEnv(BaseEnv):
             done = True
             done_info[TerminationState.CRASH_BUILDING] = True
             logging.info("Episode ended! Reason: crash building ")
-
+        if self.step_num >= self.episode_max_step:
+            done = True
+            done_info[TerminationState.CRASH_BUILDING] = True
+            logging.info("Episode ended! Reason: crash building ")
         # for compatibility
         # crash almost equals to crashing with vehicles
         done_info[TerminationState.CRASH] = (
@@ -263,6 +271,8 @@ class MetaDriveExpertEnv(BaseEnv):
             step_info["cost"] = self.config["crash_vehicle_cost"]
         elif vehicle.crash_object:
             step_info["cost"] = self.config["crash_object_cost"]
+        elif self.step_num > self.config["episode_max_step"]:
+            step_info['cost'] = 1
         return step_info['cost'], step_info
 
     def _is_out_of_road(self, vehicle):
@@ -305,7 +315,7 @@ class MetaDriveExpertEnv(BaseEnv):
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
         reward += self.config["speed_reward"] * (vehicle.speed / vehicle.max_speed) * positive_road
         #print('vel speed: {}'.format(vehicle.speed))
-        speed_rwd = -0.6 if vehicle.speed < 60 else 0
+        speed_rwd = -0.6 if vehicle.speed < 6.5* 3.6 else 0
         reward += speed_rwd
 
         step_info["step_reward"] = reward
@@ -323,6 +333,8 @@ class MetaDriveExpertEnv(BaseEnv):
             reward = -self.config["crash_vehicle_penalty"]
         elif vehicle.crash_object:
             reward = -self.config["crash_object_penalty"]
+        elif self.step_num >= self.episode_max_step:
+            reward = - self.config["run_out_of_time_penalty"]
         return reward, step_info
 
     def switch_to_third_person_view(self) -> None:
@@ -428,6 +440,7 @@ class MetaDriveExpertEnv(BaseEnv):
         ret = {}
         self.engine.after_step()
         o = None
+        self.step_num = 0
         for v_id, v in self.vehicles.items():
             self.observations[v_id].reset(self, v)
             ret[v_id] = self.observations[v_id].observe(v)
@@ -480,3 +493,9 @@ class MetaDriveExpertEnv(BaseEnv):
         )
         #o = TopDownMultiChannel(vehicle_config, self, False)
         return o
+
+
+    # def get_episode_max_step(self, distance, average_speed = 6.5):
+    #     average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
+    #     max_step = int(distance / average_dist_per_step) + 1
+    #     return max_step

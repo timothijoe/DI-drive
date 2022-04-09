@@ -143,7 +143,7 @@ class FrontBackObjects:
 
 
 class DiscreteMacroPolicy(BasePolicy):
-    NORMAL_SPEED = 65  # 65
+    NORMAL_SPEED = 30  # 65
     ACC_FACTOR = 1.0
 
     def __init__(self, control_object, random_seed):
@@ -159,7 +159,7 @@ class DiscreteMacroPolicy(BasePolicy):
 
         self.heading_pid = PIDController(1.7, 0.01, 3.5)
         self.lateral_pid = PIDController(0.2, .002, 0.3)
-        self.DELTA_SPEED = 10
+        self.DELTA_SPEED = 3
         self.DELTA = 10
         self.target_lane = self.get_neighboring_lanes()[1]
         self.target_speed = self.NORMAL_SPEED
