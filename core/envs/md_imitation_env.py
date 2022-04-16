@@ -90,7 +90,6 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     run_out_of_time_penalty = 5.0, #5.0,
     driving_reward=1.0,
     speed_reward=0.1,
-    heading_reward = 0.3, 
 
 
     # ===== Cost Scheme =====
@@ -100,10 +99,10 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # ===== Termination Scheme =====
     out_of_route_done=True,
-    physics_world_step_size=3e-2,
+    physics_world_step_size=5e-2,
 
     # ===== Trajectory length =====
-    seq_traj_len = 10,
+    seq_traj_len = 1,
     show_seq_traj = False,
     #episode_max_step = 100,
 
@@ -117,17 +116,19 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     
     # Reward Option Scheme
     const_episode_max_step = False,
-    episode_max_step = 1500,
-    avg_speed = 13.0,
+    episode_max_step = 1900,
+    #avg_speed = 13.0,
 
     use_lateral=True,
     lateral_scale = 0.25, 
 
     jerk_bias = 15.0, 
     jerk_dominator = 45.0, #50.0
-    jerk_importance = 0.6, # 0.6
-    use_speed_reward = True,
-    use_heading_reward = False,
+    jerk_importance = 0.2, # 0.6
+    # If we use sparse reward, then driving reward, speed reward, jerk reward will be ignored
+    use_sparse_reward  = False,
+
+    use_speed_reward = False,
     use_jerk_reward = False,
 )
 
@@ -184,11 +185,14 @@ class MetaDriveImitationEnv(BaseEnv):
         self.episode_rwd = 0
         self.vel_speed = 0.0
         self.z_state = np.zeros(6)
-        self.avg_speed = self.config["avg_speed"]
+        #self.avg_speed = self.config["avg_speed"]
 
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
         self.episode_steps += 1
+        for v_id, v in self.vehicles.items():
+            #onestep_o = self.observations[v_id].observe(v)
+            self._update_pen_state(v)
         actions = self._preprocess_actions(actions)
         #print('actions: {}'.format(actions))
         step_infos = self._step_simulator(actions)
@@ -220,6 +224,7 @@ class MetaDriveImitationEnv(BaseEnv):
         return actions
 
     def _step_simulator(self, actions):
+
         # Note that we use shallow update for info dict in this function! This will accelerate system.
         scene_manager_before_step_infos = self.engine.before_step(actions)
         # step all entities
@@ -230,7 +235,30 @@ class MetaDriveImitationEnv(BaseEnv):
             scene_manager_after_step_infos, scene_manager_before_step_infos, allow_new_keys=True, without_copy=True
         )
 
+    def _update_pen_state(self, vehicle):
+        vehicle.pen_state['position'] = copy.deepcopy(vehicle.prev_state['position'])
+        vehicle.pen_state['yaw'] = copy.deepcopy(vehicle.prev_state['yaw'])
+        vehicle.pen_state['speed'] = copy.deepcopy(vehicle.prev_state['speed'])
+        vehicle.prev_state['position'] = vehicle.position
+        vehicle.prev_state['yaw'] = vehicle.heading_theta 
+        vehicle.prev_state['speed'] = vehicle.speed / 3.6
 
+    def compute_jerk(self, vehicle):
+        vehicle.curr_state['position'] = vehicle.position
+        vehicle.curr_state['yaw'] = vehicle.heading_theta 
+        vehicle.curr_state['speed'] = vehicle.speed / 3.6        
+        v_t0 = vehicle.pen_state['speed']
+        theta_t0 = vehicle.pen_state['yaw']
+        v_t1 = vehicle.prev_state['speed']
+        theta_t1 = vehicle.prev_state['yaw']
+        v_t2 = vehicle.curr_state['speed']
+        theta_t2 = vehicle.curr_state['yaw']
+        t_inverse = 1.0 / self.config['physics_world_step_size']
+        jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) +  v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+        jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) +  v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
+        jerk_array = np.array([jerk_x, jerk_y])
+        jerk = np.linalg.norm(jerk_array)
+        return jerk
 
 
 
@@ -364,6 +392,7 @@ class MetaDriveImitationEnv(BaseEnv):
         :return: reward
         """
         vehicle = self.vehicles[vehicle_id]
+        jerk = self.compute_jerk(vehicle)
         step_info = dict()
 
         # Reward for moving forward in current lane
@@ -379,32 +408,36 @@ class MetaDriveImitationEnv(BaseEnv):
 
         # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
         if self.config["use_lateral"]:
-            lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            lateral_factor = clip(1 - 0.5 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            # lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
         else:
             lateral_factor = 1.0
 
         reward = 0.0
-        # lateral_factor *= 0.02
-        # reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
-        # reward += self.config["speed_reward"] * (vehicle.speed / vehicle.max_speed) * positive_road
-        # #print('vel speed: {}'.format(vehicle.speed))
-        # speed_rwd = -0.3 if vehicle.speed < 60 else 0
-        # reward += speed_rwd
+        if not self.config['use_sparse_reward']:
+            reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
+            if self.config['use_speed_reward']:
+                max_spd = 3.6 * 10.0
+                reward += self.config["speed_reward"] * (vehicle.speed / max_spd) * positive_road
+            if self.config["use_jerk_reward"]:
+                jerk_penalty = max(np.tanh((jerk-self.config["jerk_bias"])/self.config["jerk_dominator"]),0)
+                jerk_penalty = self.config["jerk_importance"] * jerk_penalty
+                reward -= jerk_penalty
 
         step_info["step_reward"] = reward
 
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
-        elif vehicle.macro_succ:
-            reward = +self.config["success_reward"]
-        # elif self._is_out_of_road(vehicle):
-        #     reward = -self.config["out_of_road_penalty"]
-        # elif vehicle.crash_vehicle:
-        #     reward = -self.config["crash_vehicle_penalty"]
+        # elif vehicle.macro_succ:
+        #     reward = +self.config["success_reward"]
+        elif self._is_out_of_road(vehicle):
+            reward = -self.config["out_of_road_penalty"]
+        elif vehicle.crash_vehicle:
+            reward = -self.config["crash_vehicle_penalty"]
         # elif vehicle.macro_crash:
         #     reward = -self.config["crash_vehicle_penalty"]
-        # elif vehicle.crash_object:
-        #     reward = -self.config["crash_object_penalty"]
+        elif vehicle.crash_object:
+            reward = -self.config["crash_object_penalty"]
         return reward, step_info
     
     def get_navigation_len(self, vehicle):
@@ -705,6 +738,9 @@ class MetaDriveImitationEnv(BaseEnv):
         self.navi_distance = 100.0
         self.remove_init_stop = True
         self.episode_max_step = self.config['episode_max_step']
+        # for v_id ,v in self.vehicles.items():
+        #     target_speed = 10
+        #     v.set_velocity(v.heading, target_speed)
         if self.remove_init_stop:
             return o_reset
         for i in range(4):
@@ -747,10 +783,10 @@ class MetaDriveImitationEnv(BaseEnv):
             angle_in_rad += 2 * np.pi
         return angle_in_rad
 
-    def get_episode_max_step(self, distance, average_speed = 13):
-        average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
-        max_step = int(distance / average_dist_per_step) + 1
-        return max_step
+    # def get_episode_max_step(self, distance, average_speed = 13):
+    #     average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
+    #     max_step = int(distance / average_dist_per_step) + 1
+    #     return max_step
 
 register(
     id='HRL-v2',

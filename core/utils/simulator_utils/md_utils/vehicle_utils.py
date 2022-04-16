@@ -5,6 +5,7 @@ from typing import Union, Dict, AnyStr, Tuple
 from core.utils.simulator_utils.md_utils.idm_policy_utils import MacroIDMPolicy
 from metadrive.component.vehicle.vehicle_type import DefaultVehicle
 import copy
+import numpy as np
 class MacroDefaultVehicle(DefaultVehicle):
 
     def __init__(self, vehicle_config: Union[dict, Config] = None, name: str = None, random_seed=None):
@@ -17,7 +18,7 @@ class MacroDefaultVehicle(DefaultVehicle):
         self.v_indx = 1
         self.physics_world_step_size = self.engine.global_config["physics_world_step_size"]
         self.penultimate_state = {}
-        import numpy as np
+        
         self.penultimate_state['position'] = np.array([0,0]) #self.last_position
         self.penultimate_state['yaw'] = 0 
         self.penultimate_state['speed'] = 0
@@ -25,12 +26,37 @@ class MacroDefaultVehicle(DefaultVehicle):
         self.traj_wp_list.append(copy.deepcopy(self.penultimate_state))
         self.traj_wp_list.append(copy.deepcopy(self.penultimate_state))
 
+        self.pen_state = {}
+        self.prev_state = {}
+        self.curr_state = {}
+        self.pen_state['position'] = np.array([0,0]) #self.last_position
+        self.pen_state['yaw'] = 0 
+        self.pen_state['speed'] = 0
+        self.prev_state['position'] = np.array([0,0]) #self.last_position
+        self.prev_state['yaw'] = 0 
+        self.prev_state['speed'] = 0
+        self.curr_state['position'] = np.array([0,0]) #self.last_position
+        self.curr_state['yaw'] = 0 
+        self.curr_state['speed'] = 0
+
     def before_macro_step(self, macro_action):
-        if macro_action ==0:
+        if macro_action is not None:
             self.last_macro_position = self.position
         else:
             pass
         return
+
+    def reset_state_stack(self):
+        self.pen_state['position'] = np.array([0,0]) #self.last_position
+        self.pen_state['yaw'] = 0 
+        self.pen_state['speed'] = 0
+        self.prev_state['position'] = np.array([0,0]) #self.last_position
+        self.prev_state['yaw'] = 0 
+        self.prev_state['speed'] = 0
+        self.curr_state['position'] = np.array([0,0]) #self.last_position
+        self.curr_state['yaw'] = 0 
+        self.curr_state['speed'] = 0          
+
     def add_navigation(self):
         # if not self.config["need_navigation"]:
         #     return

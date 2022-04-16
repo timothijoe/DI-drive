@@ -27,6 +27,9 @@ from metadrive.utils import Config, merge_dicts, get_np_random, clip
 
 from metadrive.envs.base_env import BASE_DEFAULT_CONFIG
 from metadrive.obs.top_down_obs_multi_channel import TopDownMultiChannel
+import copy
+from demo.metadrive.reward_model import TrexRewardModelAD
+import torch
 
 DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
@@ -84,9 +87,9 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # See: https://github.com/decisionforce/metadrive/issues/283
     success_reward=10.0,
     out_of_road_penalty=5.0,
-    crash_vehicle_penalty=1.0,
+    crash_vehicle_penalty=5.0,
     crash_object_penalty=5.0,
-    driving_reward=0.1,
+    driving_reward=0.4,
     speed_reward=0.5,
     heading_reward = 0.1,
     use_lateral=False,
@@ -100,6 +103,10 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Termination Scheme =====
     out_of_route_done=True,
     physics_world_step_size= 5e-2, #3e-2,
+
+    # ===== Termination Scheme =====
+    save_expert_data = False,
+    expert_data_folder = None, #  '/home/SENSETIME/zhoutong/hoffnung/xad/expert_data_folder',    
 )
 
 
@@ -164,6 +171,13 @@ class MetaDriveExpertEnv(BaseEnv):
         self.time = 0
         self.step_num = 0
         self.episode_max_step = self.config["episode_max_step"]
+        if self.config["save_expert_data"]:
+            assert self.config["expert_data_folder"] is not None
+            self.single_transition_list = []
+        self.episode_rwd = 0
+        # self.reward_model = TrexRewardModelAD()
+        # rwd_ckpt = '/home/SENSETIME/zhoutong/hoffnung/xad/test_trex_ad/reward_model/reward_ckpt'
+        # self.reward_model.reward_model.load_state_dict(torch.load(rwd_ckpt))
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
         self.episode_steps += 1
@@ -171,6 +185,8 @@ class MetaDriveExpertEnv(BaseEnv):
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
         self.step_num = self.step_num + 1
+        #print(self.step_num)
+        self.episode_rwd = self.episode_rwd + r 
         #o = o.transpose((2,0,1))
         return o, r, d, i
 
@@ -319,7 +335,7 @@ class MetaDriveExpertEnv(BaseEnv):
         reward += speed_rwd
 
         step_info["step_reward"] = reward
-        print(reward)
+        #print(reward)
 
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
@@ -412,6 +428,7 @@ class MetaDriveExpertEnv(BaseEnv):
             onestep_o = np.zeros((200, 200, 5))
             for v_id, v in self.vehicles.items():
                 onestep_o = self.observations[v_id].observe(v)
+                self._update_pen_state(v)
             #o = np.shape 
             if self.time % int(simulation_frequency / policy_frequency) == 0:
                 scene_manager_before_step_infos = self.engine.before_step_macro(actions)
@@ -421,12 +438,96 @@ class MetaDriveExpertEnv(BaseEnv):
                 scene_manager_before_step_infos = self.engine.before_step_macro()
                 self.engine.step()
             onestep_a = scene_manager_before_step_infos['default_agent']['raw_action']
+            onestep_rwd = 0
+            for v_id, v in self.vehicles.items():
+                onestep_rwd = self.calc_onestep_reward(v)
+            single_transition = {'state': onestep_o, 'action':onestep_a, 'reward': onestep_rwd}
+            #trex_rwd = self.cal_trex_reward(onestep_o)
+            if self.time % 2 == 0 and self.config["save_expert_data"]:
+                self.single_transition_list.append(single_transition)
             scene_manager_after_step_infos = self.engine.after_step()
             self.time += 1
         #scene_manager_after_step_infos = self.engine.after_step()
         return merge_dicts(
             scene_manager_after_step_infos, scene_manager_before_step_infos, allow_new_keys=True, without_copy=True
         )
+
+    def _update_pen_state(self, vehicle):
+        vehicle.pen_state['position'] = copy.deepcopy(vehicle.prev_state['position'])
+        vehicle.pen_state['yaw'] = copy.deepcopy(vehicle.prev_state['yaw'])
+        vehicle.pen_state['speed'] = copy.deepcopy(vehicle.prev_state['speed'])
+        vehicle.prev_state['position'] = vehicle.position
+        vehicle.prev_state['yaw'] = vehicle.heading_theta 
+        vehicle.prev_state['speed'] = vehicle.speed / 3.6
+
+    # def cal_trex_reward(self, onestep_o):
+    #     data = {'obs': onestep_o.transpose(2, 0, 1)}
+    #     data_list = []
+    #     data_list.append(data)
+    #     self.reward_model.estimate_observation(data_list)
+    #     return data_list[0]['reward']
+
+    
+    def calc_onestep_reward(self, vehicle):
+        vehicle.curr_state['position'] = vehicle.position
+        vehicle.curr_state['yaw'] = vehicle.heading_theta 
+        vehicle.curr_state['speed'] = vehicle.speed / 3.6
+
+        if vehicle.lane in vehicle.navigation.current_ref_lanes:
+            current_lane = vehicle.lane
+            positive_road = 1
+        else:
+            current_lane = vehicle.navigation.current_ref_lanes[0]
+            current_road = vehicle.navigation.current_road
+            positive_road = 1 if not current_road.is_negative_road() else -1
+        long_last, _ = current_lane.local_coordinates(vehicle.prev_state['position'])
+        long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
+
+        # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
+        if self.config["use_lateral"]:
+            lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+        else:
+            lateral_factor = 1.0
+
+        reward = 0.0
+        #lateral_factor
+        reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
+        reward += self.config["speed_reward"] * (vehicle.speed / 36.0) * positive_road
+        speed_rwd = -0.6 if vehicle.speed < 5.0* 3.6 else 0
+        reward += speed_rwd
+        
+        v_t0 = vehicle.pen_state['speed']
+        theta_t0 = vehicle.pen_state['yaw']
+        v_t1 = vehicle.prev_state['speed']
+        theta_t1 = vehicle.prev_state['yaw']
+        v_t2 = vehicle.curr_state['speed']
+        theta_t2 = vehicle.curr_state['yaw']
+        t_inverse = 1.0 / self.config['physics_world_step_size']
+        jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) +  v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+        jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) +  v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
+        jerk_array = np.array([jerk_x, jerk_y])
+        jerk = np.linalg.norm(jerk_array)
+        jerk_penalty = np.tanh( (jerk)/ 50)
+        reward -= jerk_penalty 
+
+        if vehicle.arrive_destination:
+            reward = +self.config["success_reward"]
+        elif vehicle.macro_succ:
+            reward = +self.config["success_reward"]
+        elif self._is_out_of_road(vehicle):
+            reward = -self.config["out_of_road_penalty"]
+        elif vehicle.crash_vehicle:
+            reward = -self.config["crash_vehicle_penalty"]
+        elif vehicle.macro_crash:
+            reward = -self.config["crash_vehicle_penalty"]
+        elif vehicle.crash_object:
+            reward = -self.config["crash_object_penalty"]
+        elif self.step_num >= self.episode_max_step:
+            reward = - self.config["run_out_of_time_penalty"]
+        return reward
+
+
+
 
     @property
     def action_space(self) -> gym.Space:
@@ -445,12 +546,28 @@ class MetaDriveExpertEnv(BaseEnv):
             self.observations[v_id].reset(self, v)
             ret[v_id] = self.observations[v_id].observe(v)
             o = self.observations[v_id].observe(v)
+            if self.config["save_expert_data"] and len(self.single_transition_list) > 10:
+                print('success: {}'.format(v.macro_succ))
+                print('traj len: {}'.format(len(self.single_transition_list)))
+                folder_name = self.config["expert_data_folder"]
+                file_num = len(os.listdir(folder_name))
+                new_file_name = "expert_data_%02i.pickle" % file_num 
+                new_file_path = os.path.join(folder_name, new_file_name)
+                traj_dict = {"transition_list": self.single_transition_list, "episode_rwd": self.episode_rwd}
+                import pickle
+                with open(new_file_path, "wb") as fp:
+                    pickle.dump(traj_dict, fp)
+
             if hasattr(v, 'macro_succ'):
+                v.reset_state_stack()
                 v.macro_succ = False
             if hasattr(v, 'macro_crash'):
                 v.macro_crash = False
         # zt_obs = zt_obs.transpose((2,0,1))
         # print('process: {}  --- > initializing: a new episode begins'.format(os.getpid()))
+        if self.config["save_expert_data"]:
+            self.single_transition_list = []
+        self.episode_rwd = 0.0
         self.remove_init_stop = True
         if self.remove_init_stop:
             return o
