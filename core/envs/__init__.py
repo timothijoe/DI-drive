@@ -10,5 +10,8 @@ if 'carla' in SIMULATORS:
     from .simple_carla_env import SimpleCarlaEnv
     from .scenario_carla_env import ScenarioCarlaEnv
 
-if 'metadrive' in SIMULATORS:
-    from .md_macro_env import MetaDriveMacroEnv
+# if 'metadrive' in SIMULATORS:
+#     from .md_macro_env import MetaDriveMacroEnv
+
+# if 'metadrive' in SIMULATORS:
+#     from md_envs.md_xad_env import MdXadEnv

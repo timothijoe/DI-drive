@@ -183,8 +183,8 @@ class HRLNodeNavigation(NodeNetworkNavigation):
                 if self.activate_car_pos_marker:
                     self.show_car_pos(ego_vehicle.v_wps, ego_vehicle.v_indx)
 
-                if ego_vehicle.v_indx == 4:
-                    print('zt')
+                # if ego_vehicle.v_indx == 4:
+                #     print('zt')
 
             # if ego_vehicle.v_indx == 0:
             #     self.draw_car_path(ego_vehicle.v_wps)
