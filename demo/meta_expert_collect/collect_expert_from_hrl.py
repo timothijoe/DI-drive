@@ -18,7 +18,7 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 10
+SEQ_TRAJ_LEN = 5
 if TRAJ_CONTROL_MODE == 'acc':
     VAE_LOAD_DIR = 'traj_model/seq_len_10_decoder_ckpt'
 else:
@@ -27,6 +27,8 @@ else:
 trex_path = 'test_trex_ad'
 trex_expert_data_folder = trex_path + '/expert_data_folder'
 trex_expert_ckpt_path = trex_path + '/expert_policy/hrl_iter_70k.pth.tar'
+#trex_expert_ckpt_path = '/home/SENSETIME/zhoutong/drive_project/log/april23/hrl_iter20.pth.tar'
+
 
 metadrive_basic_config = dict(
     exp_name = 'metadrive_basic_sac',

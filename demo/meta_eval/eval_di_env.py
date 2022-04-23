@@ -20,6 +20,7 @@ metadrive_basic_config = dict(
             use_sparse_reward = False,
             use_speed_reward = True,
             use_jerk_reward = True,
+            density=0.25,
         ),
         manager=dict(
             shared_memory=False,
@@ -83,7 +84,7 @@ def main(cfg):
     policy = PPOPolicy(cfg.policy)
     import torch
     #pathh = '/home/SENSETIME/zhoutong/drive_project/ckpt/april15/appo_iter_140k.pth.tar'
-    pathh = '/home/SENSETIME/zhoutong/drive_project/ckpt/april15/appo_10k.pth.tar'
+    pathh = '/home/SENSETIME/zhoutong/drive_project/log/april23/appo_20k.pth.tar'
     #pathh = '/home/SENSETIME/zhoutong/hoffnung/xad/metadrive_basic_ppo/ckpt/iteration_10000.pth.tar'
     policy._load_state_dict_collect(torch.load(pathh, map_location = 'cpu'))
 

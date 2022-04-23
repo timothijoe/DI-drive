@@ -32,13 +32,15 @@ trex_path = 'test_trex_ad'
 trex_reward_folder = trex_path + '/reward_model'
 trex_expert_data_folder = trex_path + '/expert_data_folder'
 trex_expert_ckpt_path = trex_path + '/expert_macro_policy/april10_iteration40k.pth.tar'
-
+# '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/a1_exp3/iteration_70000.pth.tar'
+trex_expert_ckpt_path = '/home/SENSETIME/zhoutong/drive_project/log/april23/hrl_iter20.pth.tar'
+trex_expert_ckpt_path = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/a1_exp3/iteration_70000.pth.tar'
 metadrive_basic_config = dict(
     exp_name = 'metadrive_basic_sac',
     env=dict(
         metadrive=dict(use_render=True,
             show_seq_traj = True,
-            traffic_density = 0.25,
+            traffic_density = 0.30,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
@@ -131,7 +133,7 @@ def main(cfg):
     
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/drive_project/ckpt/march23/a1_exp3/iteration_70000.pth.tar', map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load(trex_expert_ckpt_path, map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/acc_full_reward/iteration_50000.pth.tar', map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))

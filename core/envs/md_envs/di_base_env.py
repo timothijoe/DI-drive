@@ -90,10 +90,10 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     run_out_of_time_penalty = 5.0, #5.0,
     # Transition reward
     driving_reward=0.2,
-    speed_reward=0.05,
+    speed_reward=0.1,
     jerk_bias = 10.0, 
     jerk_dominator = 45.0, #50.0
-    jerk_importance = 0.15, # 0.6
+    jerk_importance = 0.20, # 0.6
 
     # ===== Termination Scheme =====
     out_of_route_done=True,
@@ -184,7 +184,9 @@ class DiBaseEnv(BaseEnv):
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
         self.episode_steps += 1
-        # actions[1] = 1
+        #actions[1] = 1
+        # if self.step_num > 10:
+        #     actions[1] = 1
         for v_id, v in self.vehicles.items():
             #onestep_o = self.observations[v_id].observe(v)
             self._update_pen_state(v)
@@ -194,7 +196,8 @@ class DiBaseEnv(BaseEnv):
         o, r, d, i = self._get_step_return(actions, step_infos)
         self.step_num = self.step_num + 1
         self.episode_rwd = self.episode_rwd + r 
-        #print('step number is: {}'.format(self.step_num))
+        # print(self.episode_rwd)
+        # print('step number is: {}'.format(self.step_num))
         #o = o.transpose((2,0,1))
         return o, r, d, i
 
@@ -247,11 +250,15 @@ class DiBaseEnv(BaseEnv):
         theta_t1 = vehicle.prev_state['yaw']
         v_t2 = vehicle.curr_state['speed']
         theta_t2 = vehicle.curr_state['yaw']
-        t_inverse = 1.0 / self.config['physics_world_step_size']
+        t_inverse = 1.0 / (self.config['physics_world_step_size'] * self.config['repeat_times'])
         jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) +  v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
         jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) +  v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
         jerk_array = np.array([jerk_x, jerk_y])
         jerk = np.linalg.norm(jerk_array)
+        #print('jerk: {}'.format(jerk))
+        #jerk = jerk if self.step_num > 10 else 0.0
+        jerk = jerk if vehicle.position[0] > 20.0 else 0.0
+        
         return jerk
 
     def _merge_extra_config(self, config: Union[dict, "Config"]) -> "Config":
@@ -381,9 +388,12 @@ class DiBaseEnv(BaseEnv):
             self.navi_distance = self.get_navigation_len(vehicle)
             if not self.config['const_episode_max_step']:
                 self.episode_max_step = self.get_episode_max_step(self.navi_distance, self.avg_speed)
-                # print('episode len: {}'.format(self.navi_distance))
-                # print('episode max step: {}'.format(self.episode_max_step))
+                print('episode len: {}'.format(self.navi_distance))
+                
+                print('episode max step: {}'.format(self.episode_max_step))
             self._compute_navi_dist = False
+
+        #print('step num: {}'.format(self.episode_steps))
 
         jerk = self.compute_jerk(vehicle)
         # Reward for moving forward in current lane
@@ -411,6 +421,7 @@ class DiBaseEnv(BaseEnv):
                 max_spd = 3.6 * 10.0
                 speed_scale = min(1.0, vehicle.speed / max_spd)
                 reward += self.config["speed_reward"] * speed_scale * positive_road
+            #print('before reward: {}'.format(reward))
             if self.config["use_jerk_reward"]:
                 jerk_penalty = max(np.tanh((jerk-self.config["jerk_bias"])/self.config["jerk_dominator"]),0)
                 jerk_penalty = self.config["jerk_importance"] * jerk_penalty
@@ -433,6 +444,9 @@ class DiBaseEnv(BaseEnv):
         #     reward = -self.config["crash_vehicle_penalty"]
         elif vehicle.crash_object:
             reward = -self.config["crash_object_penalty"]
+        elif self.step_num >= self.episode_max_step:
+            reward = - self.config["run_out_of_time_penalty"]
+        #print('after reward: {}'.format(reward))
         return reward, step_info
     
     def get_navigation_len(self, vehicle):
@@ -653,7 +667,7 @@ class DiBaseEnv(BaseEnv):
 
     def get_episode_max_step(self, distance, average_speed = 6.5):
         # average_speed must be m/s rather than km/h
-        average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
+        average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size'] * self.config['repeat_times']
         max_step = int(distance / average_dist_per_step) + 1
         return max_step
 

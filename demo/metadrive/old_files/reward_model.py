@@ -103,7 +103,7 @@ class ConvEncoder(nn.Module):
         self.mid = nn.Sequential(
             nn.Linear(flatten_size, hidden_size_list[-2]), self.act,
             nn.Linear(hidden_size_list[-2], hidden_size_list[-1]),
-            nn.Tanh(),
+            #nn.Tanh(),
         )
 
     def _get_flatten_size(self) -> int:
