@@ -89,11 +89,11 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     crash_object_penalty=5.0, #5.0,
     run_out_of_time_penalty = 5.0, #5.0,
     # Transition reward
-    driving_reward=0.2,
-    speed_reward=0.1,
-    jerk_bias = 10.0, 
+    driving_reward=0.5,
+    speed_reward=0.2,
+    jerk_bias = 15.0, 
     jerk_dominator = 45.0, #50.0
-    jerk_importance = 0.20, # 0.6
+    jerk_importance = 0.10, # 0.6
 
     # ===== Termination Scheme =====
     out_of_route_done=True,
@@ -187,6 +187,7 @@ class DiBaseEnv(BaseEnv):
         #actions[1] = 1
         # if self.step_num > 10:
         #     actions[1] = 1
+        print('actions: {}'.format(actions))
         for v_id, v in self.vehicles.items():
             #onestep_o = self.observations[v_id].observe(v)
             self._update_pen_state(v)
@@ -421,7 +422,7 @@ class DiBaseEnv(BaseEnv):
                 max_spd = 3.6 * 10.0
                 speed_scale = min(1.0, vehicle.speed / max_spd)
                 reward += self.config["speed_reward"] * speed_scale * positive_road
-            #print('before reward: {}'.format(reward))
+            print('before reward: {}'.format(reward))
             if self.config["use_jerk_reward"]:
                 jerk_penalty = max(np.tanh((jerk-self.config["jerk_bias"])/self.config["jerk_dominator"]),0)
                 jerk_penalty = self.config["jerk_importance"] * jerk_penalty

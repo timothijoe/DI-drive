@@ -34,7 +34,7 @@ trex_expert_data_folder = trex_path + '/expert_data_folder'
 trex_expert_ckpt_path = trex_path + '/expert_macro_policy/april10_iteration40k.pth.tar'
 # '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/a1_exp3/iteration_70000.pth.tar'
 trex_expert_ckpt_path = '/home/SENSETIME/zhoutong/drive_project/log/april23/hrl_iter20.pth.tar'
-trex_expert_ckpt_path = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/a1_exp3/iteration_70000.pth.tar'
+trex_expert_ckpt_path = '/home/SENSETIME/zhoutong/drive_project/ckpt/may3/iteration_70000.pth.tar'
 metadrive_basic_config = dict(
     exp_name = 'metadrive_basic_sac',
     env=dict(
@@ -53,7 +53,9 @@ metadrive_basic_config = dict(
             use_jerk_reward = True,
             show_interface=False,
             save_expert_data = False,
+            save_expert_traj = False,
             expert_data_folder=trex_expert_data_folder,
+            expert_traj_folder=trex_expert_data_folder,
         ),
         manager=dict(
             shared_memory=False,

@@ -129,6 +129,8 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Expert data saving =====
     save_expert_data = False,
     expert_data_folder = None,  
+    save_expert_traj = False,
+    expert_traj_folder = None,
 
 )
 
@@ -193,13 +195,25 @@ class MetadriveHrlEnv(BaseEnv):
         if self.config["save_expert_data"]:
             assert self.config["expert_data_folder"] is not None
             self.single_transition_list = []
-
-    # define a action type, and execution style
+        if self.config["save_expert_traj"]:
+            assert self.config["expert_traj_folder"] is not None
+            self.single_transition_list = []
+    # define a action type, and execution style 
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
     # now that in this situation, we directly set trajectory len equals to simulation frequency
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
-        self.episode_steps += 1
+        self.episode_steps += 1    
+        if self.config['save_expert_traj']:
+            o_dict = {}
+            onestep_o = np.zeros((200, 200, 5))
+            for v_id, v in self.vehicles.items():
+                onestep_o = self.observations[v_id].observe(v)
+            o_dict['birdview'] = onestep_o.transpose((2, 0, 1))
+            v_state = self.z_state[:4]
+            o_dict['vehicle_state'] = v_state
+            single_transition = {'state': o_dict, 'action': actions}
+            self.single_transition_list.append(single_transition)
         macro_actions = self._preprocess_macro_waypoints(actions)
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
@@ -765,6 +779,17 @@ class MetadriveHrlEnv(BaseEnv):
                 import pickle
                 with open(new_file_path, "wb") as fp:
                     pickle.dump(traj_dict, fp)
+            if self.config["save_expert_traj"] and len(self.single_transition_list) > 10:
+                print('success: {}'.format(v.macro_succ))
+                print('traj len: {}'.format(len(self.single_transition_list)))
+                folder_name = self.config["expert_traj_folder"]
+                file_num = len(os.listdir(folder_name))
+                new_file_name = "expert_data_%02i.pickle" % file_num 
+                new_file_path = os.path.join(folder_name, new_file_name)
+                traj_dict = {"transition_list": self.single_transition_list, "episode_rwd": self.episode_rwd}
+                import pickle
+                with open(new_file_path, "wb") as fp:
+                    pickle.dump(traj_dict, fp) 
 
             self.update_current_state(v_id)
             self.vel_speed = 0
@@ -802,6 +827,8 @@ class MetadriveHrlEnv(BaseEnv):
             v.last_spd = 0
 
         if self.config["save_expert_data"]:
+            self.single_transition_list = []
+        if self.config["save_expert_traj"]:
             self.single_transition_list = []
         #self.episode_rwd = 0.0
         self.already_go_dist = 0

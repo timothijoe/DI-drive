@@ -9,7 +9,7 @@ from ding.config import compile_config
 from ding.policy import PPOPolicy
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner
 from core.envs import DriveEnvWrapper
-from core.envs.md_imitation_env import MetaDriveImitationEnv
+from core.envs.md_envs.di_base_env import DiBaseEnv
 from demo.metadrive.old_files.reward_model import TrexRewardModelAD
 import torch
 import os
@@ -56,7 +56,7 @@ metadrive_basic_config = dict(
 main_config = EasyDict(metadrive_basic_config)
 
 def wrapped_env(env_cfg, wrapper_cfg=None):
-    return DriveEnvWrapper(MetaDriveImitationEnv(env_cfg), wrapper_cfg)
+    return DriveEnvWrapper(DiBaseEnv(env_cfg), wrapper_cfg)
 # def wrapped_train_env(env_cfg):
 #     env = gym.make("MetaDrive-1000envs-v0", config=env_cfg)
 #     return DriveEnvWrapper(env)
