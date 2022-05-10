@@ -83,8 +83,8 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Reward Scheme =====
     # See: https://github.com/decisionforce/metadrive/issues/283
     success_reward= 10.0, #10.0,
-    out_of_road_penalty= 1.0, #5.0,
-    crash_vehicle_penalty=1.0, #1.0,
+    out_of_road_penalty= 5.0, #5.0,
+    crash_vehicle_penalty=5.0, #1.0,
     crash_object_penalty=5.0, #5.0,
     run_out_of_time_penalty = 5.0, #5.0,
     driving_reward=0.1,
@@ -110,7 +110,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
 
     #traj_control_mode = 'acc', # another type is 'jerk'
-    traj_control_mode = 'jerk',
+    traj_control_mode = 'acc',
     # if we choose traj_control_mode = 'acc', then the current state is [0,0,0,v] and the control signal is throttle and steer
     # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
     
@@ -412,8 +412,8 @@ class MetaDriveTrajEnv(BaseEnv):
             speed_list = self.compute_speed_list(vehicle)
             for speed in speed_list: 
                 speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
-                if speed < self.avg_speed:
-                    speed_reward -= 0.12 #0.06
+                if speed < self.avg_speed * 2 / 3:
+                    speed_reward -= 0.06 #0.06
         if self.config["use_heading_reward"]:
             # Heading Reward
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)

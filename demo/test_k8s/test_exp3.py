@@ -18,7 +18,7 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 20
+SEQ_TRAJ_LEN = 10
 if TRAJ_CONTROL_MODE == 'acc':
     if SEQ_TRAJ_LEN == 10:
         VAE_LOAD_DIR = 'traj_model/seq_len_10_decoder_ckpt'
@@ -40,9 +40,9 @@ metadrive_basic_config = dict(
             traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
-            #map='OSOS', 
+            map='OSOS', 
             #map='XSXS',
-            map='SSSSSSS',
+            #map='SSSSSSS',
             #show_interface=False,
             use_lateral=True,
             use_speed_reward = True,
@@ -131,7 +131,7 @@ def main(cfg):
     
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march28/d4_exp3__pretrain_len20_iter140k.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may10/round_20k.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
