@@ -118,7 +118,7 @@ def main(cfg):
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     #replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/a1_exp3/iteration_70000.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may10/a3_exp1_iter30k.pth'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
     policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))

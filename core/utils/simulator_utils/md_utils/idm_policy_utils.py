@@ -8,7 +8,7 @@ class MacroIDMPolicy(IDMPolicy):
         super(MacroIDMPolicy, self).__init__(control_object=control_object, random_seed=random_seed)
         self.NORMAL_SPEED_CONST = 18 #15
         self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
-        self.LANE_CHANGE_FREQ = 300
+        self.LANE_CHANGE_FREQ = 300 #300
 
     def act(self, *args, **kwargs):
         # concat lane

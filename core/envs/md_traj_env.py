@@ -428,11 +428,11 @@ class MetaDriveTrajEnv(BaseEnv):
                 jerk_penalty = self.config["jerk_importance"] * jerk_penalty
                 jerk_reward -= jerk_penalty
         reward = driving_reward + speed_reward + heading_reward + jerk_reward 
-        print('driving reward: {}'.format(driving_reward))
-        print('speed reward: {}'.format(speed_reward))
-        print('heading reward: {}'.format(heading_reward))
-        print('jerk reward: {}'.format(jerk_reward))
-        print('speed: {}'.format(speed))
+        # print('driving reward: {}'.format(driving_reward))
+        # print('speed reward: {}'.format(speed_reward))
+        # print('heading reward: {}'.format(heading_reward))
+        # print('jerk reward: {}'.format(jerk_reward))
+        # print('speed: {}'.format(speed))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]

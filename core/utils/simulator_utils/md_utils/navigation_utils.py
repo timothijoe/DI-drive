@@ -29,7 +29,7 @@ class HRLNodeNavigation(NodeNetworkNavigation):
 
         #self.drawd = False
         
-        self.LINE_TO_DEST_HEIGHT += 4
+        self.LINE_TO_DEST_HEIGHT += 1
         self.activate_car_pos_marker = False
 
     def _init_trajs(self):

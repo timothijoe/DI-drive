@@ -18,12 +18,13 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 15
+SEQ_TRAJ_LEN = 20
 if TRAJ_CONTROL_MODE == 'acc':
     if SEQ_TRAJ_LEN == 10:
         VAE_LOAD_DIR = 'traj_model/seq_len_10_decoder_ckpt'
     elif SEQ_TRAJ_LEN == 15:
         VAE_LOAD_DIR = 'traj_model/seq_len_15_decoder_ckpt'
+        #VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_15_78_decoder_ckpt'
     elif SEQ_TRAJ_LEN == 20:
         VAE_LOAD_DIR = 'traj_model/seq_len_20_decoder_ckpt'
         
@@ -130,12 +131,12 @@ def main(cfg):
     
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/a1_exp3/iteration_70000.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march28/d4_exp3__pretrain_len20_iter140k.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
-    policy._load_state_dict_collect(torch.load(dir))
+    policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
+    #policy._load_state_dict_collect(torch.load(dir))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/acc_full_reward/iteration_50000.pth.tar', map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))

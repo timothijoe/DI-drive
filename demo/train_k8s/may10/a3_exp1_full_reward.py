@@ -9,37 +9,35 @@ from ding.config import compile_config
 from ding.policy import SACPolicy
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, NaiveReplayBuffer
 from core.envs import DriveEnvWrapper
-#from core.policy.ad_policy.conv_qac import ConvQAC
-from core.envs.md_traj_env import MetaDriveTrajEnv
-from core.policy.hrl_policy.traj_qac import ConvQAC 
-from core.policy.hrl_policy.traj_sac import TrajSAC
+from core.policy.ad_policy.conv_qac import ConvQAC
+#from core.envs.md_control_env import MetaDriveControlEnv
+#from core.envs.jerk_control_md_env import JerkControlMdEnv
 from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
+#from core.policy.hrl_policy.traj_qac import ConvQAC 
+from core.policy.hrl_policy.control_qac import ControlQAC 
+from core.policy.hrl_policy.traj_sac import TrajSAC
+from core.envs.md_traj_env import MetaDriveTrajEnv
+
 
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 15
-if TRAJ_CONTROL_MODE == 'acc':
-    VAE_LOAD_DIR = 'ckpt_files/seq_len_10_decoder_ckpt'
-elif TRAJ_CONTROL_MODE == 'jerk': 
-    VAE_LOAD_DIR = 'ckpt_files/new_jerk_decoder_ckpt'
-else:
-    VAE_LOAD_DIR = None
+SEQ_TRAJ_LEN = 1
+
 metadrive_basic_config = dict(
-    exp_name = 'b1_exp3_full_reward',
+    exp_name = 'a3_exp1_full_reward',
     env=dict(
-        metadrive=dict(use_render=False,
+        metadrive=dict(
             show_seq_traj = False,
-            traffic_density = 0.4,
+            traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
             #map='XSXS',
             #show_interface=False,
-            use_lateral=False,
+            use_lateral=True,
             use_speed_reward = True,
             use_heading_reward = True,
             use_jerk_reward = True,
-            heading_reward=0.2,
-        ),
+            ),
         manager=dict(
             shared_memory=False,
             max_retry=2,
@@ -54,11 +52,10 @@ metadrive_basic_config = dict(
         cuda=True,
         model=dict(
             obs_shape=[5, 200, 200],
-            action_shape=2,
+            action_shape=2 * SEQ_TRAJ_LEN,
             encoder_hidden_size_list=[128, 128, 64],
-            vae_seq_len = SEQ_TRAJ_LEN,
             vae_traj_control_mode = TRAJ_CONTROL_MODE,
-            vae_load_dir= VAE_LOAD_DIR, #'/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/jerk_ckpt',
+            vae_seq_len = SEQ_TRAJ_LEN,
         ),
         learn=dict(
             update_per_collect=100,
@@ -109,7 +106,7 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    model = ConvQAC(**cfg.policy.model)
+    model = ControlQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
@@ -122,7 +119,7 @@ def main(cfg):
 
     while True:
         if evaluator.should_eval(learner.train_iter):
-            # stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
+            #stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
             stop, rate = evaluator.evall(learner.save_checkpoint, learner.train_iter, collector.envstep, collector._total_episode_count, collector._total_duration)
             if stop:
                 break
