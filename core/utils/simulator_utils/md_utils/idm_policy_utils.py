@@ -59,7 +59,7 @@ class MacroIDMPolicy(IDMPolicy):
         total_lane_num = len(current_lanes)
         current_lane_idx = current_lane.index[-1]
         if current_lane_idx == 0 or current_lane_idx == current_lane_idx-1:
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 1
         elif current_lane_idx % 2 == 0:
             self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 2
         else:

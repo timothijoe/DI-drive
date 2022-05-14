@@ -118,6 +118,9 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     const_episode_max_step = False,
     episode_max_step = 150,
     avg_speed = 6.0,
+    speed_bias = 4.0,
+    high_spd_rwd_scale = 1.0,
+    low_spd_rwd_scale = 2.0,
 
     use_lateral=True,
     lateral_scale = 0.25, 
@@ -411,9 +414,14 @@ class MetaDriveTrajEnv(BaseEnv):
             max_spd = 10
             speed_list = self.compute_speed_list(vehicle)
             for speed in speed_list: 
-                speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
-                if speed < self.avg_speed:
-                    speed_reward -= 0.08 #0.06
+                if speed < self.config['speed_bias']:
+                    speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['low_spd_rwd_scale']
+                else:
+                    speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['high_spd_rwd_scale']
+
+                # speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
+                # if speed < self.avg_speed:
+                #     speed_reward -= 0.08 #0.06
         if self.config["use_heading_reward"]:
             # Heading Reward
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
@@ -428,12 +436,12 @@ class MetaDriveTrajEnv(BaseEnv):
                 jerk_penalty = self.config["jerk_importance"] * jerk_penalty
                 jerk_reward -= jerk_penalty
         reward = driving_reward + speed_reward + heading_reward + jerk_reward 
-        # print('driving reward: {}'.format(driving_reward))
-        # print('speed reward: {}'.format(speed_reward))
-        # print('heading reward: {}'.format(heading_reward))
-        # print('jerk reward: {}'.format(jerk_reward))
-        # print('speed: {}'.format(speed))
-        print('reward: {}'.format(reward))
+        print('driving reward: {}'.format(driving_reward))
+        print('speed reward: {}'.format(speed_reward))
+        print('heading reward: {}'.format(heading_reward))
+        print('jerk reward: {}'.format(jerk_reward))
+        print('speed: {}'.format(speed))
+        #print('reward: {}'.format(reward))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]

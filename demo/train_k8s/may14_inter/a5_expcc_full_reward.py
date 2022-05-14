@@ -17,13 +17,14 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 from core.policy.hrl_policy.control_qac import ControlQAC 
 from core.policy.hrl_policy.traj_sac import TrajSAC
 from core.envs.md_traj_env import MetaDriveTrajEnv
-
+from core.policy.hrl_policy.const_qac import ConstQAC 
+from core.policy.hrl_policy.traj_sac import TrajSAC
 
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 1
+SEQ_TRAJ_LEN = 10
 
 metadrive_basic_config = dict(
-    exp_name = 'a3_exp1_full_reward',
+    exp_name = 'a5_expcc_inter',
     env=dict(
         metadrive=dict(
             show_seq_traj = False,
@@ -31,9 +32,9 @@ metadrive_basic_config = dict(
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
-            #map='XSXS',
+            map='XSXS',
+            avg_speed=7.0, 
             #show_interface=False,
-            avg_speed = 6.0,
             use_lateral=True,
             use_speed_reward = True,
             use_heading_reward = True,
@@ -53,7 +54,7 @@ metadrive_basic_config = dict(
         cuda=True,
         model=dict(
             obs_shape=[5, 200, 200],
-            action_shape=2 * SEQ_TRAJ_LEN,
+            action_shape=2,
             encoder_hidden_size_list=[128, 128, 64],
             vae_traj_control_mode = TRAJ_CONTROL_MODE,
             vae_seq_len = SEQ_TRAJ_LEN,
@@ -107,7 +108,7 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-    model = ControlQAC(**cfg.policy.model)
+    model = ConstQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
 
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))

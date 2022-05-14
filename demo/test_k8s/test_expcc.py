@@ -19,7 +19,7 @@ from core.policy.hrl_policy.const_qac import ConstQAC
 from core.policy.hrl_policy.traj_sac import TrajSAC
 
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
-SEQ_TRAJ_LEN = 15
+SEQ_TRAJ_LEN = 10
 
 metadrive_basic_config = dict(
     exp_name = 'az3_exp1_sac_inter',

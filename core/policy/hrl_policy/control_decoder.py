@@ -219,8 +219,8 @@ class CCDecoder(nn.Module):
         prev_state = init_state 
         assert z.shape[1] == 2
         for i in range(self.seq_len):
-            control_1 = z[:, 0]
-            control_2 = z[:, 1]
+            control_1 = z[:, 0] #+ torch.randn(z[:,0].shape).to(torch.device("cuda")) * 0.1
+            control_2 = z[:, 1] #+ torch.randn(z[:,0].shape).to(torch.device("cuda")) * 0.1
             if self.traj_control_mode == 'jerk':
                 curr_state = self.plant_model_jerk(prev_state, control_1, control_2, self.dt)
             elif self.traj_control_mode == 'acc':

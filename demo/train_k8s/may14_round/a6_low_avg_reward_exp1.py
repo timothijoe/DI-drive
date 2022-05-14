@@ -23,7 +23,7 @@ TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
 SEQ_TRAJ_LEN = 1
 
 metadrive_basic_config = dict(
-    exp_name = 'a3_exp1_full_reward',
+    exp_name = 'a6_trex_expert_model',
     env=dict(
         metadrive=dict(
             show_seq_traj = False,
@@ -33,11 +33,11 @@ metadrive_basic_config = dict(
             #map='OSOS', 
             #map='XSXS',
             #show_interface=False,
-            avg_speed = 6.0,
             use_lateral=True,
             use_speed_reward = True,
             use_heading_reward = True,
-            use_jerk_reward = True,
+            use_jerk_reward = False,
+            avg_speed=5.0,
             ),
         manager=dict(
             shared_memory=False,
