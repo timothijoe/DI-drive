@@ -27,9 +27,10 @@ metadrive_basic_config = dict(
         metadrive=dict(
             use_render=True,
             seq_traj_len = SEQ_TRAJ_LEN,
+            show_seq_traj = True,
             #use_jerk_penalty = True,
             #use_lateral_penalty = False,
-            traffic_density = 0.35,
+            traffic_density = 0.3,
             traj_control_mode = TRAJ_CONTROL_MODE,
             use_speed_reward = True,
             #const_episode_max_step = True, 
@@ -118,7 +119,7 @@ def main(cfg):
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     #replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march28/c5_expcc_len15_iter40k.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may10/expcc_150k.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c5_iteration_40000.pth.tar'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
     policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))

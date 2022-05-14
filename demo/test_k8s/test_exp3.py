@@ -9,7 +9,8 @@ from ding.config import compile_config
 from ding.policy import SACPolicy
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, NaiveReplayBuffer
 from core.envs import DriveEnvWrapper
-#from core.policy.ad_policy.conv_qac import ConvQAC
+#from core.policy.ad_policy.conv_qac i
+# mport ConvQAC
 from core.envs.md_traj_env import MetaDriveTrajEnv
 from core.policy.hrl_policy.traj_qac import ConvQAC 
 from core.policy.hrl_policy.traj_sac import TrajSAC
@@ -40,7 +41,7 @@ metadrive_basic_config = dict(
             traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
-            map='OSOS', 
+            #map='OSOS', 
             #map='XSXS',
             #map='SSSSSSS',
             #show_interface=False,
@@ -131,7 +132,7 @@ def main(cfg):
     
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may10/round_20k.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may10/straight_20k.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))

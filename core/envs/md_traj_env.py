@@ -117,7 +117,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # Reward Option Scheme
     const_episode_max_step = False,
     episode_max_step = 150,
-    avg_speed = 6.5,
+    avg_speed = 6.0,
 
     use_lateral=True,
     lateral_scale = 0.25, 
@@ -412,8 +412,8 @@ class MetaDriveTrajEnv(BaseEnv):
             speed_list = self.compute_speed_list(vehicle)
             for speed in speed_list: 
                 speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
-                if speed < self.avg_speed * 2 / 3:
-                    speed_reward -= 0.06 #0.06
+                if speed < self.avg_speed:
+                    speed_reward -= 0.08 #0.06
         if self.config["use_heading_reward"]:
             # Heading Reward
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
@@ -433,6 +433,7 @@ class MetaDriveTrajEnv(BaseEnv):
         # print('heading reward: {}'.format(heading_reward))
         # print('jerk reward: {}'.format(jerk_reward))
         # print('speed: {}'.format(speed))
+        print('reward: {}'.format(reward))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
