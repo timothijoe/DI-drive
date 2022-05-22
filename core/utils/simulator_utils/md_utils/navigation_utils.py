@@ -109,12 +109,17 @@ class HRLNodeNavigation(NodeNetworkNavigation):
         self.current_pos_marker = NodePath(lines.create(False))
         self.current_pos_marker.hide(CamMask.Shadow | CamMask.RgbCam)
         self.current_pos_marker.reparentTo(self.origin)
-        for i in range(self.seq_traj_len):
+        actual_traj_len = self.seq_traj_len
+        if len(wp_list) - 1 < self.seq_traj_len:
+            actual_traj_len = len(wp_list) - 1
+
+        for ii in range(self.seq_traj_len):
             lines = LineSegs()
-            if current_time_step > i:
+            if current_time_step > ii:
                 lines.setColor(1.0, 0.4, 0.0, 0.7)
             else:
                 lines.setColor(0.0, 0.7, 1.0, 0.7)
+            i = ii if ii <= actual_traj_len - 1 else actual_traj_len-1
             #lines.setColor(self.navi_mark_color[0], self.navi_mark_color[1], self.navi_mark_color[2], 0.7)
             #lines.moveTo(panda_position(wp_list[i][0], self.LINE_TO_DEST_HEIGHT+4))
             lines.moveTo(panda_position((wp_list[i][0], wp_list[i][1]), self.LINE_TO_DEST_HEIGHT))
@@ -183,8 +188,8 @@ class HRLNodeNavigation(NodeNetworkNavigation):
                 if self.activate_car_pos_marker:
                     self.show_car_pos(ego_vehicle.v_wps, ego_vehicle.v_indx)
 
-                if ego_vehicle.v_indx == 4:
-                    print('zt')
+                # if ego_vehicle.v_indx == 4:
+                #     print('zt')
 
             # if ego_vehicle.v_indx == 0:
             #     self.draw_car_path(ego_vehicle.v_wps)

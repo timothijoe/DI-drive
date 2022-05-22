@@ -206,6 +206,7 @@ class MetaDriveTrajEnv(BaseEnv):
         self.vel_speed = 0.0
         self.z_state = np.zeros(6)
         self.avg_speed = self.config["avg_speed"]
+        self.zt = 0
 
     # define a action type, and execution style
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
@@ -393,10 +394,11 @@ class MetaDriveTrajEnv(BaseEnv):
         long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
         self.already_go_dist += (long_now - long_last)
         #print('already_go_dist: {}'.format(self.already_go_dist))
-        avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
+        
         # use_lateral_penalty = False
         # # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
         if self.config["use_lateral"]:
+            avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
             lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
             #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
         else:
@@ -436,11 +438,11 @@ class MetaDriveTrajEnv(BaseEnv):
                 jerk_penalty = self.config["jerk_importance"] * jerk_penalty
                 jerk_reward -= jerk_penalty
         reward = driving_reward + speed_reward + heading_reward + jerk_reward 
-        print('driving reward: {}'.format(driving_reward))
-        print('speed reward: {}'.format(speed_reward))
-        print('heading reward: {}'.format(heading_reward))
-        print('jerk reward: {}'.format(jerk_reward))
-        print('speed: {}'.format(speed))
+        # print('driving reward: {}'.format(driving_reward))
+        # print('speed reward: {}'.format(speed_reward))
+        # print('heading reward: {}'.format(heading_reward))
+        # print('jerk reward: {}'.format(jerk_reward))
+        # print('speed: {}'.format(speed))
         #print('reward: {}'.format(reward))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
@@ -488,7 +490,7 @@ class MetaDriveTrajEnv(BaseEnv):
         first_point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) +  v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
         jerk_list.append(np.array([first_point_jerk_x, first_point_jerk_y]))
         # plus one because we store the current value as first, which means the whole trajectory is seq_traj_len + 1
-        for i in range(2, self.config['seq_traj_len'] + 1):
+        for i in range(2, len(vehicle.traj_wp_list)):
             v_t0 = vehicle.traj_wp_list[i-2]['speed']
             theta_t0 = vehicle.traj_wp_list[i-2]['yaw']
             v_t1 = vehicle.traj_wp_list[i-1]['speed']
@@ -536,7 +538,8 @@ class MetaDriveTrajEnv(BaseEnv):
 
     def compute_heading_error_list(self, vehicle, lane):
         heading_error_list = []
-        for i in range(1, self.config['seq_traj_len'] + 1):
+        #for i in range(1, self.config['seq_traj_len'] + 1):
+        for i in range(1, len(vehicle.traj_wp_list)):
             theta = vehicle.traj_wp_list[i]['yaw'] 
             long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
             road_heading_theta = lane.heading_theta_at(long_now)
@@ -546,7 +549,8 @@ class MetaDriveTrajEnv(BaseEnv):
 
     def compute_speed_list(self, vehicle):
         speed_list = []
-        for i in range(1, self.config['seq_traj_len'] + 1):
+        #for i in range(1, self.config['seq_traj_len'] + 1):
+        for i in range(1, len(vehicle.traj_wp_list)):
             speed = vehicle.traj_wp_list[i]['speed']
             speed_list.append(speed)
         return speed_list
@@ -556,10 +560,11 @@ class MetaDriveTrajEnv(BaseEnv):
         # average the factor by seq traj len
         # For example, if traj len is 10, then i = 1, 2, ... 10
         lateral_cum = 0
-        for i in range(1, self.config['seq_traj_len'] + 1):
+        #for i in range(1, self.config['seq_traj_len'] + 1):
+        for i in range(1, len(vehicle.traj_wp_list)):
             long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
             lateral_cum += np.abs(lateral_now)
-        avg_lateral_cum = lateral_cum / float(self.config['seq_traj_len'])
+        avg_lateral_cum = lateral_cum / float(len(vehicle.traj_wp_list) - 1) #float(self.config['seq_traj_len'])
         return avg_lateral_cum
 
     def switch_to_third_person_view(self) -> None:
@@ -702,6 +707,11 @@ class MetaDriveTrajEnv(BaseEnv):
         simulation_frequency = self.config['seq_traj_len']
         policy_frequency = 1
         frames = int(simulation_frequency / policy_frequency)
+        # print(actions)
+        # print(len(actions))
+        #assert frames == actions['default_agent'].shape[0] -1
+        frames = actions['default_agent'].shape[0] -1
+        #print(frames)
         self.time = 0
         # print('seq len is: ')
         # print(self.config['seq_traj_len'])
@@ -712,6 +722,7 @@ class MetaDriveTrajEnv(BaseEnv):
         # for vid in actions.keys():
         #     wps[vid] = wp_list
         wps = actions
+        self.zt += 1
         for frame in range(frames):
             # we use frame to update robot position, and use wps to represent the whole trajectory
             scene_manager_before_step_infos = self.engine.before_step_macro(frame, wps)
