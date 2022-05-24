@@ -214,6 +214,10 @@ class MetaDriveTrajEnv(BaseEnv):
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
         self.episode_steps += 1
+        if isinstance(actions, dict):
+            actions = actions['traj']
+        if actions[11,1] == -1.0:
+            actions = actions[:11,:]
         # if not isinstance(actions,list):
         #     action_seq = []
         #     for i in range(31):

@@ -28,8 +28,8 @@ VAE_LOAD_DIR = 'ckpt_files/variate_len_decoder_ckpt'
 metadrive_basic_config = dict(
     exp_name = 'zq_exp3_variate_len',
     env=dict(
-        metadrive=dict(use_render=False,
-            show_seq_traj = False,
+        metadrive=dict(use_render=True,
+            show_seq_traj = True,
             traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
@@ -49,8 +49,8 @@ metadrive_basic_config = dict(
         ),
         n_evaluator_episode=1,
         stop_value=99999,
-        collector_env_num=20,
-        evaluator_env_num=4,
+        collector_env_num=1,
+        evaluator_env_num=1,
     ),
     policy=dict(
         cuda=True,
@@ -63,12 +63,12 @@ metadrive_basic_config = dict(
             vae_load_dir= VAE_LOAD_DIR, #'/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/jerk_ckpt',
         ),
         learn=dict(
-            update_per_collect=100,
+            update_per_collect=30,
             batch_size=64,
             learning_rate=3e-4,
         ),
         collect=dict(
-            n_sample=5000,
+            n_sample=200,
         ),
         eval=dict(
             evaluator=dict(

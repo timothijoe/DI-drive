@@ -199,6 +199,7 @@ class TrajSAC(SACPolicy):
             action = torch.tanh(dist.rsample())
             output = {'logit': (mu, sigma), 'latent_action': action}
             traj = self._collect_model.generate_traj_from_lat(output['latent_action'], init_state)
+            traj = {'traj': traj}
             output['trajectory'] = traj
             output['action'] = traj 
         if self._cuda:
@@ -263,6 +264,7 @@ class TrajSAC(SACPolicy):
             action = torch.tanh(mu)  # deterministic_eval
             output = {'latent_action': action}
             traj = self._eval_model.generate_traj_from_lat(output['latent_action'], init_state)
+            traj = {'traj': traj}
             output['trajectory'] = traj 
             output['action'] = traj 
         if self._cuda:

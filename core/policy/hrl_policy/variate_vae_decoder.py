@@ -140,5 +140,6 @@ class VaeDecoder(nn.Module):
         generated_traj, output_label = self.decode(z, init_state)
         traj_len_index = torch.argmax(output_label, dim = 1)
         if traj_len_index[0] == 0:
-            generated_traj = generated_traj[:,:10,:]
+            #generated_traj = generated_traj[:,:10,:]
+            generated_traj[:,10:,:] = -1.0
         return generated_traj

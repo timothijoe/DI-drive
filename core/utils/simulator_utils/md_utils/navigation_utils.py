@@ -125,10 +125,10 @@ class HRLNodeNavigation(NodeNetworkNavigation):
             lines.moveTo(panda_position((wp_list[i][0], wp_list[i][1]), self.LINE_TO_DEST_HEIGHT))
             lines.drawTo(panda_position((wp_list[i+1][0], wp_list[i+1][1]), self.LINE_TO_DEST_HEIGHT))
             lines.setThickness(2)
-            self.__dict__['traj_{}'.format(i)].removeNode()
-            self.__dict__['traj_{}'.format(i)] = NodePath(lines.create(False))
-            self.__dict__['traj_{}'.format(i)].hide(CamMask.Shadow | CamMask.RgbCam)
-            self.__dict__['traj_{}'.format(i)].reparentTo(self.origin)
+            self.__dict__['traj_{}'.format(ii)].removeNode()
+            self.__dict__['traj_{}'.format(ii)] = NodePath(lines.create(False))
+            self.__dict__['traj_{}'.format(ii)].hide(CamMask.Shadow | CamMask.RgbCam)
+            self.__dict__['traj_{}'.format(ii)].reparentTo(self.origin)
 
     def get_waypoint_list(self):
         x = np.arange(0, 50, 0.1)
