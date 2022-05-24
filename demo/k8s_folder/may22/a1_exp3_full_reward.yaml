@@ -14,6 +14,25 @@
    #   parallelWorkers: 1  # 表示每个worker中启动的parallel workers数目
    template:
      spec:
+
+       affinity:
+         nodeAffinity:
+           requiredDuringSchedulingIgnoredDuringExecution:
+             nodeSelectorTerms:
+             - matchExpressions:
+               - key: kubernetes.io/hostname
+                 operator: In
+                 values:
+                 - HOST-10-142-40-19
+                 - HOST-10-142-40-54
+                 - HOST-10-142-40-55
+                 - HOST-10-142-40-56
+                 - HOST-10-142-40-57
+                 - HOST-10-142-40-58
+                 - HOST-10-142-40-59 
+                 - HOST-10-142-40-61
+                 - HOST-10-142-40-62
+
        containers:
        - name: di-container
          image: opendilab/ding:nightly
