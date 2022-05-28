@@ -24,7 +24,7 @@ SEQ_TRAJ_LEN = 20
 # else:
 #     VAE_LOAD_DIR = None
 # /home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/variate_len_decoder_ckpt
-VAE_LOAD_DIR = 'ckpt_files/variate_len_decoder_ckpt'
+VAE_LOAD_DIR = 'ckpt_files/variate_len_decoder2_ckpt'
 metadrive_basic_config = dict(
     exp_name = 'zq_exp3_variate_len',
     env=dict(
