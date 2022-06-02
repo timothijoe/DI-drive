@@ -90,6 +90,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     driving_reward=0.1,
     speed_reward=0.2,
     heading_reward = 0.3, 
+    extra_heading_penalty = False,
 
 
     # ===== Cost Scheme =====
@@ -117,6 +118,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # Reward Option Scheme
     const_episode_max_step = False,
     episode_max_step = 150,
+    variate_len_label = True, # if variate len label is True, const episode max step must be false
     avg_speed = 6.0,
     speed_bias = 4.0,
     high_spd_rwd_scale = 1.0,
@@ -150,11 +152,6 @@ class MetaDriveTrajEnv(BaseEnv):
         global_config = self._post_process_config(merged_config)
         self.config = global_config
 
-        # if self.config["seq_traj_len"] == 1:
-        #     self.config["episode_max_step"] = self.config["episode_max_step"] * 10
-        # if self.config["seq_traj_len"] == 20:
-        #     self.config["episode_max_step"] = self.config["episode_max_step"] // 2
-
         # agent check
         self.num_agents = self.config["num_agents"]
         self.is_multi_agent = self.config["is_multi_agent"]
@@ -186,23 +183,7 @@ class MetaDriveTrajEnv(BaseEnv):
         self.time = 0
         self.step_num = 0
         self.episode_rwd = 0
-        # self.vae_decoder = VaeDecoder(
-        #         embedding_dim = 64,
-        #         h_dim = 64,
-        #         latent_dim = 2,
-        #         seq_len = self.config['seq_traj_len'],
-        #         dt = 0.1
-        #     )
-        # # vae_load_dir = 'ckpt_files/a79_decoder_ckpt'
-        # # vae_load_dir = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_20_79_decoder_ckpt'
-        # if self.config['seq_traj_len'] == 10:
-        #     vae_load_dir = 'ckpt_files/seq_len_10_decoder_ckpt'
-        # elif self.config['seq_traj_len'] == 15:
-        #     vae_load_dir = 'ckpt_files/seq_len_15_78_decoder_ckpt'
-        # else:
-        #     assert self.config['seq_traj_len'] == 20
-        #     vae_load_dir = 'ckpt_files/seq_len_20_79_decoder_ckpt'
-        # self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
+
         self.vel_speed = 0.0
         self.z_state = np.zeros(6)
         self.avg_speed = self.config["avg_speed"]
@@ -218,31 +199,18 @@ class MetaDriveTrajEnv(BaseEnv):
             actions = actions['traj']
         if actions[11,1] == -1.0:
             actions = actions[:11,:]
-        # if not isinstance(actions,list):
-        #     action_seq = []
-        #     for i in range(31):
-        #         action_seq.append([actions[2 * i], actions[2 *i+1]])
-        #     actions = action_seq
-        #action_seq =  np.array(action_seq)
-        # init_state = np.zeros([1, 4])
-        # init_state[0,3] = self.vel_speed
-        # init_state = torch.from_numpy(init_state)
-        #actions = np.array([1,1])
-        # if isinstance(actions, np.ndarray):
-        #     batch_action = torch.from_numpy(actions)
-        #     batch_action = torch.unsqueeze(batch_action, 0)
-        #     batch_action = batch_action.to(torch.float32)
-        #     init_state = init_state.to(torch.float32)
-        #     with torch.no_grad():
-        #         trajs = self.vae_decoder(batch_action, init_state)
-        #     trajs = torch.cat([init_state.unsqueeze(1), trajs], dim = 1)
-        #     trajs = trajs[:,:,:2]
-        #     trajs = torch.squeeze(trajs, 0)
-        #     actions = trajs.numpy()
+        print(actions.shape)
+
         macro_actions = self._preprocess_macro_waypoints(actions)
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
-        self.step_num = self.step_num + 1
+        #self.step_num = self.step_num + 1
+        if self.config['variate_len_label']:
+            self.step_num = self.step_num + len(actions) - 1
+            print('len: {}'.format(len(actions)-1))
+            print('step num: {}, and total step num is : {}'.format(self.step_num,self.episode_max_step))
+        else:
+            self.step_num = self.step_num + self.config['seq_traj_len']
         self.episode_rwd = self.episode_rwd + r 
         #print('step number is: {}'.format(self.step_num))
         #o = o.transpose((2,0,1))
@@ -359,7 +327,7 @@ class MetaDriveTrajEnv(BaseEnv):
             step_info["cost"] = self.config["crash_vehicle_cost"]
         elif vehicle.crash_object:
             step_info["cost"] = self.config["crash_object_cost"]
-        elif self.step_num > self.config["episode_max_step"]:
+        elif self.step_num > self.episode_max_step:
             step_info['cost'] = 1
         return step_info['cost'], step_info
 
@@ -432,7 +400,9 @@ class MetaDriveTrajEnv(BaseEnv):
             # Heading Reward
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
             for heading_error in heading_error_list:
-                heading_reward += self.config["heading_reward"] * (0 - np.abs(heading_error))             
+                heading_reward += self.config["heading_reward"] * (0 - np.abs(heading_error)) 
+            if self.config['extra_heading_penalty']:
+                heading_reward += 5 * self.config['heading_reward'] * (0 - np.abs(heading_error_list[-1]))      
         if self.config["use_jerk_reward"]:
             jerk_list = self.compute_jerk_list(vehicle)
             for jerk in jerk_list:
@@ -446,8 +416,9 @@ class MetaDriveTrajEnv(BaseEnv):
         # print('speed reward: {}'.format(speed_reward))
         # print('heading reward: {}'.format(heading_reward))
         # print('jerk reward: {}'.format(jerk_reward))
+        # print('jerk list: {}'.format(jerk_list))
         # print('speed: {}'.format(speed))
-        #print('reward: {}'.format(reward))
+        print('reward: {}'.format(reward))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
@@ -510,21 +481,6 @@ class MetaDriveTrajEnv(BaseEnv):
             #final_jerk_value += np.linalg.norm(jerk)
             step_jerk_list.append(np.linalg.norm(jerk))
         return step_jerk_list
-
-
-    # def update_current_state(self, vehicle):
-    #     vehicle = self.vehicles[vehicle_id]
-    #     t_inverse = 1.0 / self.config['physics_world_step_size']
-    #     theta_t1 = vehicle.traj_wp_list[-2]['yaw']
-    #     theta_t2 = vehicle.traj_wp_list[-1]['yaw']
-    #     v_t1 = vehicle.traj_wp_list[-2]['speed']
-    #     v_t2 = vehicle.traj_wp_list[-1]['speed']
-    #     v_state = np.zeros(6)
-    #     v_state[3] = v_t2
-    #     v_state[4] = (v_t2 - v_t1) * t_inverse 
-    #     theta_dot = (theta_t2 - theta_t1) * t_inverse
-    #     v_state[5] = np.arctan(2.5 * theta_dot / v_t2) if v_t2 > 0.001 else 0.0
-    #     self.z_state = v_state
 
     def update_current_state(self, vehicle_id):
         vehicle = self.vehicles[vehicle_id]
@@ -787,7 +743,7 @@ class MetaDriveTrajEnv(BaseEnv):
         self._compute_navi_dist = True 
         self.navi_distance = 100.0
         self.remove_init_stop = True
-        self.episode_max_step = self.config['episode_max_step']
+        self.episode_max_step = self.config['episode_max_step'] * self.config['seq_traj_len']
         if self.remove_init_stop:
             return o_reset
         return o_reset
@@ -828,10 +784,15 @@ class MetaDriveTrajEnv(BaseEnv):
             angle_in_rad += 2 * np.pi
         return angle_in_rad
 
+    # def get_episode_max_step(self, distance, average_speed = 6.5):
+    #     average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
+    #     max_step = int(distance / average_dist_per_step) + 1
+    #     return max_step
+
     def get_episode_max_step(self, distance, average_speed = 6.5):
-        average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
-        max_step = int(distance / average_dist_per_step) + 1
-        return max_step
+        average_dist_per_step = float(average_speed * self.config['physics_world_step_size'])
+        max_env_step = int(distance / average_dist_per_step) + 1
+        return max_env_step 
 
 register(
     id='HRL-v1',

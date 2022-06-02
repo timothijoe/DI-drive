@@ -27,7 +27,7 @@ if TRAJ_CONTROL_MODE == 'acc':
         VAE_LOAD_DIR = 'traj_model/seq_len_15_decoder_ckpt'
         #VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_15_78_decoder_ckpt'
     elif SEQ_TRAJ_LEN == 20:
-        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/variate_len_vae/result/May20th-5/ckpt/39_decoder_ckpt'
+        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/variate_len_decoder3_ckpt'
         
 elif TRAJ_CONTROL_MODE == 'jerk': 
     VAE_LOAD_DIR = 'ckpt_files/new_jerk_decoder_ckpt'
@@ -50,7 +50,7 @@ metadrive_basic_config = dict(
             use_heading_reward = True,
             use_jerk_reward = True,
             show_interface=False,
-            avg_speed=6.5,
+            avg_speed=7.5,
             # const_episode_max_step = True,
             # episode_max_step = 250,
         ),
@@ -133,11 +133,14 @@ def main(cfg):
     
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
     import torch
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may10/exp3_straight_50k.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may26/var_len_20k.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/v4_var_20k.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/vvv8_iter90k.pth.tar'
+    
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load(dir))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/acc_full_reward/iteration_50000.pth.tar', map_location = 'cpu'))

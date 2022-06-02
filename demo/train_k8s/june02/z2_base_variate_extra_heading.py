@@ -26,21 +26,25 @@ SEQ_TRAJ_LEN = 20
 # /home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/variate_len_decoder_ckpt
 VAE_LOAD_DIR = 'ckpt_files/variate_len_decoder3_ckpt'
 metadrive_basic_config = dict(
-    exp_name = 'zq_exp3_variate_len',
+    exp_name = 'z2_base_variate_extra_heading',
     env=dict(
-        metadrive=dict(use_render=True,
-            show_seq_traj = True,
+        metadrive=dict(use_render=False,
+            show_seq_traj = False,
             traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
             #map='XSXS',
             #show_interface=False,
-            avg_speed = 6.0,
+            avg_speed = 6.5,
             use_lateral=True,
             use_speed_reward = True,
             use_heading_reward = True,
             use_jerk_reward = True,
+            heading_reward = 0.1,
+            jerk_importance = 0.2,
+            run_out_of_time_penalty = 10.0,
+            extra_heading_penalty = True,
         ),
         manager=dict(
             shared_memory=False,
@@ -49,8 +53,8 @@ metadrive_basic_config = dict(
         ),
         n_evaluator_episode=1,
         stop_value=99999,
-        collector_env_num=1,
-        evaluator_env_num=1,
+        collector_env_num=20,
+        evaluator_env_num=4,
     ),
     policy=dict(
         cuda=True,
@@ -63,12 +67,15 @@ metadrive_basic_config = dict(
             vae_load_dir= VAE_LOAD_DIR, #'/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/jerk_ckpt',
         ),
         learn=dict(
-            update_per_collect=30,
+            update_per_collect=100,
             batch_size=64,
             learning_rate=3e-4,
+            learner=dict(
+                hook = dict(save_ckpt_after_iter=1000,),
+            ),
         ),
         collect=dict(
-            n_sample=200,
+            n_sample=5000,
         ),
         eval=dict(
             evaluator=dict(
@@ -106,10 +113,10 @@ def main(cfg):
         env_fn=[partial(wrapped_env, cfg.env.metadrive) for _ in range(collector_env_num)],
         cfg=cfg.env.manager,
     )
-    # evaluator_env = SyncSubprocessEnvManager(
-    #     env_fn=[partial(wrapped_env, cfg.env.metadrive) for _ in range(evaluator_env_num)],
-    #     cfg=cfg.env.manager,
-    # )
+    evaluator_env = SyncSubprocessEnvManager(
+        env_fn=[partial(wrapped_env, cfg.env.metadrive) for _ in range(evaluator_env_num)],
+        cfg=cfg.env.manager,
+    )
 
     model = ConvQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
@@ -117,17 +124,17 @@ def main(cfg):
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
     collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
-    #evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
+    evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
 
     learner.call_hook('before_run')
 
     while True:
-        # if evaluator.should_eval(learner.train_iter):
-        #     # stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
-        #     stop, rate = evaluator.evall(learner.save_checkpoint, learner.train_iter, collector.envstep, collector._total_episode_count, collector._total_duration)
-        #     if stop:
-        #         break
+        if evaluator.should_eval(learner.train_iter):
+            # stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
+            stop, rate = evaluator.evall(learner.save_checkpoint, learner.train_iter, collector.envstep, collector._total_episode_count, collector._total_duration)
+            if stop:
+                break
         # Sampling data from environments
         new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
         replay_buffer.push(new_data, cur_collector_envstep=collector.envstep)

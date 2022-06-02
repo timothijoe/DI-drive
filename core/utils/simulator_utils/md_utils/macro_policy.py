@@ -261,6 +261,11 @@ class ManualMacroDiscretePolicy(BasePolicy):
         new_state['yaw'] = heading_theta_at
         new_state['speed'] = ego_vehicle.last_spd
         self.control_object.traj_wp_list.append(new_state)
+
+        # print('frame: {}'.format(frame))
+        # print('wp_list_len: {}'.format(len(self.control_object.traj_wp_list)))
+        # print('control wp_list: {}'.format(self.control_object.traj_wp_list))
+        # print('pen point: {}'.format(self.control_object.penultimate_state))
         #print(ego_vehicle.physics_world_step_size)
         #ego_vehicle.last_spd = norm / 0.03 * 3.6
         #ego_vehicle.set_velocity(heading_theta_at, norm / 0.03 *3.6)
