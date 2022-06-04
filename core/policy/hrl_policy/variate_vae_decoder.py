@@ -14,6 +14,7 @@ class VaeDecoder(nn.Module):
         use_relative_pos = True,
         dt = 0.1,
         traj_control_mode = 'acc',
+        one_side_class_vae = False,
         ):
         super(VaeDecoder, self).__init__()
         self.embedding_dim = embedding_dim
@@ -35,9 +36,11 @@ class VaeDecoder(nn.Module):
         self.hidden2control = nn.Linear(self.h_dim, 2)
         self.decoder = nn.LSTM(self.embedding_dim, self.h_dim, self.num_layers)
         self.init_hidden_decoder = torch.nn.Linear(in_features = self.latent_dim, out_features = self.h_dim * self.num_layers)
+        self.one_side_class_vae = one_side_class_vae
         label_dims = [self.h_dim, self.h_dim, self.h_dim, self.label_dim]
         label_modules = []
-        in_channels = self.latent_dim
+        #in_channels = self.latent_dim
+        in_channels = 1 if self.one_side_class_vae else self.latent_dim
         for m_dim in label_dims:
             label_modules.append(
                 nn.Sequential(
@@ -111,7 +114,11 @@ class VaeDecoder(nn.Module):
     def decode(self, z, init_state):
         generated_traj = []
         prev_state = init_state 
-        output_label = self.label_classification(z)
+        # output_label = self.label_classification(z)
+        if self.one_side_class_vae:
+            output_label = self.label_classification(z[:,:1])
+        else:
+            output_label = self.label_classification(z[:,:])
         # decoder_input shape: batch_size x 4
         decoder_input = self.spatial_embedding(prev_state)
         decoder_input = decoder_input.view(1, -1 , self.embedding_dim)

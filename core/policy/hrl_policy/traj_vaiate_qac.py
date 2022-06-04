@@ -110,6 +110,7 @@ class ConvQAC(QAC):
             vae_dt = 0.1,
             vae_traj_control_mode = 'jerk',
             vae_load_dir = None,
+            one_side_class_vae = False,
     ):
         super(QAC, self).__init__()
         obs_shape: int = squeeze(obs_shape)
@@ -195,6 +196,7 @@ class ConvQAC(QAC):
             seq_len = vae_seq_len,
             dt = vae_dt,
             traj_control_mode = vae_traj_control_mode,
+            one_side_class_vae=one_side_class_vae,
         )
         if vae_load_dir is not None:
             self._traj_decoder.load_state_dict(torch.load(vae_load_dir))

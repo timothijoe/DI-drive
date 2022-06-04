@@ -199,7 +199,7 @@ class MetaDriveTrajEnv(BaseEnv):
             actions = actions['traj']
         if actions[11,1] == -1.0:
             actions = actions[:11,:]
-        print(actions.shape)
+        #print(actions.shape)
 
         macro_actions = self._preprocess_macro_waypoints(actions)
         step_infos = self._step_macro_simulator(macro_actions)
@@ -208,7 +208,7 @@ class MetaDriveTrajEnv(BaseEnv):
         if self.config['variate_len_label']:
             self.step_num = self.step_num + len(actions) - 1
             print('len: {}'.format(len(actions)-1))
-            print('step num: {}, and total step num is : {}'.format(self.step_num,self.episode_max_step))
+            # print('step num: {}, and total step num is : {}'.format(self.step_num,self.episode_max_step))
         else:
             self.step_num = self.step_num + self.config['seq_traj_len']
         self.episode_rwd = self.episode_rwd + r 
@@ -416,9 +416,9 @@ class MetaDriveTrajEnv(BaseEnv):
         # print('speed reward: {}'.format(speed_reward))
         # print('heading reward: {}'.format(heading_reward))
         # print('jerk reward: {}'.format(jerk_reward))
-        # print('jerk list: {}'.format(jerk_list))
-        # print('speed: {}'.format(speed))
-        print('reward: {}'.format(reward))
+        # # print('jerk list: {}'.format(jerk_list))
+        # # print('speed: {}'.format(speed))
+        # print('reward: {}'.format(reward))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
