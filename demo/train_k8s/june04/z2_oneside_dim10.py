@@ -27,7 +27,7 @@ SEQ_TRAJ_LEN = 20
 # /home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/variate_len_decoder_ckpt
 VAE_LOAD_DIR = 'traj_model/var_len_zdim10_oneside_ckpt'
 metadrive_basic_config = dict(
-    exp_name = 'z1_oneside_dim3',
+    exp_name = 'z2_oneside_dim10',
     env=dict(
         metadrive=dict(use_render=False,
             show_seq_traj = False,

@@ -207,7 +207,7 @@ class MetaDriveTrajEnv(BaseEnv):
         #self.step_num = self.step_num + 1
         if self.config['variate_len_label']:
             self.step_num = self.step_num + len(actions) - 1
-            print('len: {}'.format(len(actions)-1))
+            #print('len: {}'.format(len(actions)-1))
             # print('step num: {}, and total step num is : {}'.format(self.step_num,self.episode_max_step))
         else:
             self.step_num = self.step_num + self.config['seq_traj_len']
@@ -412,12 +412,17 @@ class MetaDriveTrajEnv(BaseEnv):
                 jerk_penalty = self.config["jerk_importance"] * jerk_penalty
                 jerk_reward -= jerk_penalty
         reward = driving_reward + speed_reward + heading_reward + jerk_reward 
+        # print('##############################################################')
+        # print('##############################################################')
+        # print('##############################################################')
+        # print('##############################################################')
         # print('driving reward: {}'.format(driving_reward))
         # print('speed reward: {}'.format(speed_reward))
         # print('heading reward: {}'.format(heading_reward))
         # print('jerk reward: {}'.format(jerk_reward))
         # # print('jerk list: {}'.format(jerk_list))
         # # print('speed: {}'.format(speed))
+        # print('##############################################################')
         # print('reward: {}'.format(reward))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:

@@ -9,72 +9,60 @@ from ding.config import compile_config
 from ding.policy import SACPolicy
 from ding.worker import SampleSerialCollector, InteractionSerialEvaluator, BaseLearner, NaiveReplayBuffer
 from core.envs import DriveEnvWrapper
-#from core.policy.ad_policy.conv_qac i
-# mport ConvQAC
+#from core.policy.ad_policy.conv_qac import ConvQAC
 from core.envs.md_traj_env import MetaDriveTrajEnv
 from core.policy.hrl_policy.traj_vaiate_qac import ConvQAC 
 from core.policy.hrl_policy.traj_sac import TrajSAC
 from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
-
-ONE_SIDE_CLASS_VAE = True
+ONE_SIDE_CLASS_VAE = False
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
 SEQ_TRAJ_LEN = 20
-if TRAJ_CONTROL_MODE == 'acc':
-    if SEQ_TRAJ_LEN == 10:
-        VAE_LOAD_DIR = 'traj_model/seq_len_10_decoder_ckpt'
-    elif SEQ_TRAJ_LEN == 15:
-        VAE_LOAD_DIR = 'traj_model/seq_len_15_decoder_ckpt'
-        #VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_15_78_decoder_ckpt'
-    elif SEQ_TRAJ_LEN == 20:
-        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/var_len_zdim10_oneside_ckpt'
-        #VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/var_len_zdim10_oneside_ckpt'
-        
-elif TRAJ_CONTROL_MODE == 'jerk': 
-    VAE_LOAD_DIR = 'ckpt_files/new_jerk_decoder_ckpt'
-else:
-    VAE_LOAD_DIR = None
+# if TRAJ_CONTROL_MODE == 'acc':
+#     VAE_LOAD_DIR = 'ckpt_files/seq_len_10_decoder_ckpt'
+# elif TRAJ_CONTROL_MODE == 'jerk': 
+#     VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/variate_len_vae/result/May20th-5/ckpt/39_decoder_ckpt'
+# else:
+#     VAE_LOAD_DIR = None
+# /home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/variate_len_decoder_ckpt
+VAE_LOAD_DIR = 'traj_model/variate_len_dim3_noone_ckpt'
 metadrive_basic_config = dict(
-    exp_name = 'metadrive_basic_sac',
+    exp_name = 'z3_noone_dim3',
     env=dict(
-        metadrive=dict(use_render=True,
-            show_seq_traj = True,
+        metadrive=dict(use_render=False,
+            show_seq_traj = False,
             traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
             #map='XSXS',
-            #map='SSSSSSS',
             #show_interface=False,
+            avg_speed = 6.5,
             use_lateral=True,
             use_speed_reward = True,
             use_heading_reward = True,
             use_jerk_reward = True,
-            show_interface=False,
-            avg_speed=6.5,
-            heading_reward = 0.3,
-            jerk_importance = 0.5,
+            heading_reward = 0.1,
+            jerk_importance = 0.2,
             run_out_of_time_penalty = 10.0,
-            extra_heading_penalty = False,
-            # const_episode_max_step = True,
-            # episode_max_step = 250,
+            extra_heading_penalty = True,
         ),
         manager=dict(
             shared_memory=False,
             max_retry=2,
             context='spawn',
         ),
-        n_evaluator_episode=1,
+        n_evaluator_episode=20,
         stop_value=99999,
-        collector_env_num=1,
-        evaluator_env_num=1,
+        collector_env_num=20,
+        evaluator_env_num=4,
     ),
     policy=dict(
         cuda=True,
         model=dict(
             obs_shape=[5, 200, 200],
-            action_shape=10,
-            vae_latent_dim = 10,
+            action_shape=3,
+            vae_latent_dim = 3,
             encoder_hidden_size_list=[128, 128, 64],
             vae_seq_len = SEQ_TRAJ_LEN,
             vae_traj_control_mode = TRAJ_CONTROL_MODE,
@@ -82,16 +70,19 @@ metadrive_basic_config = dict(
             vae_load_dir= VAE_LOAD_DIR, #'/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/jerk_ckpt',
         ),
         learn=dict(
-            update_per_collect=10,
+            update_per_collect=100,
             batch_size=64,
             learning_rate=3e-4,
+            learner=dict(
+                hook = dict(save_ckpt_after_iter=1000,),
+            ),
         ),
         collect=dict(
-            n_sample=50,
+            n_sample=5000,
         ),
         eval=dict(
             evaluator=dict(
-                eval_freq=10,
+                eval_freq=1000,
                 )
             ),
         other=dict(
@@ -133,32 +124,33 @@ def main(cfg):
     model = ConvQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
 
-
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
-    #collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
-    
+    collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
+    evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     replay_buffer = NaiveReplayBuffer(cfg.policy.other.replay_buffer, tb_logger, exp_name=cfg.exp_name)
-    import torch
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may26/var_len_20k.pth.tar'
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/v4_var_20k.pth.tar'
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/vvv8_iter90k.pth.tar'
-    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/iteration_17000.pth.tar'
-    
-    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
-    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
-    policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load(dir))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/acc_full_reward/iteration_50000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))
-    tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
-    evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
-    for iter in range(5):
-        stop, reward = evaluator.eval()
-    evaluator.close()
 
+    learner.call_hook('before_run')
+
+    while True:
+        if evaluator.should_eval(learner.train_iter):
+            # stop, rate = evaluator.eval(learner.save_checkpoint, learner.train_iter, collector.envstep)
+            stop, rate = evaluator.evall(learner.save_checkpoint, learner.train_iter, collector.envstep, collector._total_episode_count, collector._total_duration)
+            if stop:
+                break
+        # Sampling data from environments
+        new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
+        replay_buffer.push(new_data, cur_collector_envstep=collector.envstep)
+        for i in range(cfg.policy.learn.update_per_collect):
+            train_data = replay_buffer.sample(learner.policy.get_attribute('batch_size'), learner.train_iter)
+            if train_data is None:
+                break
+            learner.train(train_data, collector.envstep)
+    learner.call_hook('after_run')
+
+    collector.close()
+    evaluator.close()
+    learner.close()
 
 if __name__ == '__main__':
     main(main_config)
