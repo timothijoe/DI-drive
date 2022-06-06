@@ -1,0 +1,72 @@
+ apiVersion: diengine.opendilab.org/v2alpha1
+ kind: DIJob
+ metadata:
+   name: a2-oneside-addition-heading
+ spec:
+   group: "base"  # 标记job所属的group
+   priority: "normal"  # 表示job的优先级，保留字段，调度中或许可以用到
+   cleanPodPolicy: "None"  # 表示job运行完成之后，如何处理worker pods
+   preemptible: false  # 表示job是否允许被抢占，调度中对job资源改动之后涉及到抢占操作
+   minReplicas: 1
+   maxReplicas: 1
+   # engineFields:
+   #   topology: "star"  # 表示workers之间的拓扑连接
+   #   parallelWorkers: 1  # 表示每个worker中启动的parallel workers数目
+   template:
+     spec:
+
+       affinity:
+         nodeAffinity:
+           requiredDuringSchedulingIgnoredDuringExecution:
+             nodeSelectorTerms:
+             - matchExpressions:
+               - key: kubernetes.io/hostname
+                 operator: In
+                 values:
+                 - host-10-142-40-19
+                 - host-10-142-40-54
+                 - host-10-142-40-55
+                 - host-10-142-40-56
+                 - host-10-142-40-57
+                 - host-10-142-40-58
+                 - host-10-142-40-59 
+                 - host-10-142-40-61
+                 - host-10-142-40-62
+
+       containers:
+       - name: di-container
+         image: opendilab/ding:nightly
+         imagePullPolicy: Always  # IfNotPresent
+         env:
+         - name: PYTHONUNBUFFERED
+           value: "1" 
+         resources:
+           requests:
+             nvidia.com/gpu: 1
+             cpu: 40
+             memory: "120Gi"
+           limits:
+             nvidia.com/gpu: 1
+             cpu: 60
+             memory: "150Gi"
+         command: ["/bin/bash", "-c",]
+         args:
+         - |
+           cd /mnt/nfs/zhoutong/lattern/DI-engine
+           pip install -e .
+           cd /mnt/nfs/zhoutong/lattern/metadrive
+           pip install -e .
+           cd /mnt/nfs/zhoutong/lattern/xad
+           pip install -e .
+           python3 -u /mnt/nfs/zhoutong/lattern/xad/demo/train_k8s/june06/z2_oneside_addition_heading.py
+         volumeMounts:
+         - name: work-dir
+           mountPath: /mnt/nfs/zhoutong
+       volumes:
+       - name: cache-volume
+         emptyDir:
+           medium: Memory
+           sizeLimit: 128Mi
+       - name: work-dir
+         hostPath:
+           path: /mnt/nfs/zhoutong

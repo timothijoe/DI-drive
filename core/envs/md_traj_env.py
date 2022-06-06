@@ -416,14 +416,17 @@ class MetaDriveTrajEnv(BaseEnv):
         # print('##############################################################')
         # print('##############################################################')
         # print('##############################################################')
-        # print('driving reward: {}'.format(driving_reward))
-        # print('speed reward: {}'.format(speed_reward))
-        # print('heading reward: {}'.format(heading_reward))
-        # print('jerk reward: {}'.format(jerk_reward))
-        # # print('jerk list: {}'.format(jerk_list))
-        # # print('speed: {}'.format(speed))
+        print('driving reward: {}'.format(driving_reward))
+        print('speed reward: {}'.format(speed_reward))
+        print('heading reward: {}'.format(heading_reward))
+        print('jerk reward: {}'.format(jerk_reward))
+        # print('jerk list: {}'.format(jerk_list))
+        # print('speed: {}'.format(speed))
         # print('##############################################################')
-        # print('reward: {}'.format(reward))
+        print('reward: {}'.format(reward))
+        print('self step num: {}'.format(self.step_num))
+        if self.step_num > 80:
+            print('##############################################################')
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
