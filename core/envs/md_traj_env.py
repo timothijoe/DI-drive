@@ -127,12 +127,20 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     use_lateral=True,
     lateral_scale = 0.25, 
 
+    # jerk related 
     jerk_bias = 15.0, 
     jerk_dominator = 45.0, #50.0
     jerk_importance = 0.6, # 0.6
+
+    # steer rate related 
+    sr_bias = 1.00, 
+    sr_dominator = 1.50 ,
+    sr_importance = 1.0,
+
     use_speed_reward = True,
     use_heading_reward = False,
     use_jerk_reward = False,
+    use_steer_rate_reward = False,
 )
 
 
@@ -381,6 +389,7 @@ class MetaDriveTrajEnv(BaseEnv):
         speed_reward = 0.0
         heading_reward = 0.0
         jerk_reward = 0.0 
+        steer_rate_reward = 0.0
         # Generally speaking, driving reward is a necessity
         driving_reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
         # # Speed reward
@@ -405,28 +414,42 @@ class MetaDriveTrajEnv(BaseEnv):
                 heading_reward += 5 * self.config['heading_reward'] * (0 - np.abs(heading_error_list[-1]))      
         if self.config["use_jerk_reward"]:
             jerk_list = self.compute_jerk_list(vehicle)
+            #yaw_diff_list = self.compute_yaw_rate_diff(vehicle)
             for jerk in jerk_list:
                 #jerk_reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
                 #jerk_reward += (0.03 - self.config["jerk_importance"] * np.tanh(jerk / self.config["jerk_dominator"]))
                 jerk_penalty = max(np.tanh((jerk-self.config["jerk_bias"])/self.config["jerk_dominator"]),0)
                 jerk_penalty = self.config["jerk_importance"] * jerk_penalty
                 jerk_reward -= jerk_penalty
+
+        if self.config["use_steer_rate_reward"]:
+            steer_rate_list = self.compute_yaw_rate_diff(vehicle)
+            for steer_rate in steer_rate_list:
+                steer_rate = np.abs(steer_rate)
+                steer_rate_penalty = max(np.tanh((steer_rate - self.config["sr_bias"]) / self.config["sr_dominator"]), 0)
+                steer_rate_penalty = self.config["sr_importance"] * steer_rate_penalty 
+                steer_rate_reward -= steer_rate_penalty 
         reward = driving_reward + speed_reward + heading_reward + jerk_reward 
-        # print('##############################################################')
-        # print('##############################################################')
-        # print('##############################################################')
-        # print('##############################################################')
-        print('driving reward: {}'.format(driving_reward))
-        print('speed reward: {}'.format(speed_reward))
-        print('heading reward: {}'.format(heading_reward))
-        print('jerk reward: {}'.format(jerk_reward))
-        # print('jerk list: {}'.format(jerk_list))
-        # print('speed: {}'.format(speed))
-        # print('##############################################################')
-        print('reward: {}'.format(reward))
-        print('self step num: {}'.format(self.step_num))
-        if self.step_num > 80:
-            print('##############################################################')
+        # # print('##############################################################')
+        # # print('##############################################################')
+        # # print('##############################################################')
+        # # print('##############################################################')
+        # print('driving reward: {}'.format(driving_reward))
+        # print('speed reward: {}'.format(speed_reward))
+        # print('heading reward: {}'.format(heading_reward))
+        # print('jerk reward: {}'.format(jerk_reward))
+        # print('steer rate reward: {}'.format(steer_rate_reward))
+        # # print('jerk list: {}'.format(jerk_list))
+        # # print('speed: {}'.format(speed))
+        # # print('##############################################################')
+        # print('reward: {}'.format(reward))
+        # print('##################')
+        # # print('jerk list: {}'.format(jerk_list))
+        # # print('##################')
+        # print('yaw_diff list: {}'.format(steer_rate_list))
+        # print('self step num: {}'.format(self.step_num))
+        # if self.step_num > 80:
+        #     print('##############################################################')
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
@@ -489,6 +512,48 @@ class MetaDriveTrajEnv(BaseEnv):
             #final_jerk_value += np.linalg.norm(jerk)
             step_jerk_list.append(np.linalg.norm(jerk))
         return step_jerk_list
+
+    def compute_yaw_rate_diff(self, vehicle):
+        yaw_rate_diff_list = []
+        theta_t0 = vehicle.penultimate_state['yaw']
+        theta_t1 = vehicle.traj_wp_list[0]['yaw']
+        theta_t2 = vehicle.traj_wp_list[1]['yaw']
+        v_1 = vehicle.traj_wp_list[0]['speed']
+        v_2 = vehicle.traj_wp_list[1]['speed']
+        t_inverse = 1.0 / self.config['physics_world_step_size']
+        diff_theta_1 = theta_t1 - theta_t0
+        theta1_dot  = self.wrap_angle(diff_theta_1) * t_inverse
+        steer1 = np.arctan(2.5 * theta1_dot / v_1) if v_1 > 0.001 else 0.0
+
+        diff_theta_2 = theta_t2 - theta_t1 
+        theta2_dot  = self.wrap_angle(diff_theta_2) * t_inverse
+        steer2 = np.arctan(2.5 * theta2_dot / v_2) if v_2 > 0.001 else 0.0
+        steer_rate_first = (steer2 - steer1) * t_inverse
+        #first_yaw_rate_diff = np.abs((diff_theta_2 - diff_theta_1)) * t_inverse
+        yaw_rate_diff_list.append(steer_rate_first)
+        for i in range(2, len(vehicle.traj_wp_list)):
+            theta_t0 = vehicle.traj_wp_list[i-2]['yaw']
+            theta_t1 = vehicle.traj_wp_list[i-1]['yaw']
+            theta_t2 = vehicle.traj_wp_list[i]['yaw']
+
+
+            diff_theta_1 = theta_t1 - theta_t0
+            theta1_dot  = self.wrap_angle(diff_theta_1) * t_inverse
+            steer1 = np.arctan(2.5 * theta1_dot / v_1) if v_1 > 0.001 else 0.0
+
+            diff_theta_2 = theta_t2 - theta_t1 
+            theta2_dot  = self.wrap_angle(diff_theta_2) * t_inverse
+            steer2 = np.arctan(2.5 * theta2_dot / v_2) if v_2 > 0.001 else 0.0
+            steer_rate = (steer2 - steer1) * t_inverse
+            # diff_theta_1 = theta_t1 - theta_t0
+            # diff_theta_1 = self.wrap_angle(diff_theta_1) * t_inverse
+            # diff_theta_2 = theta_t2 - theta_t1 
+            # diff_theta_2 = self.wrap_angle(diff_theta_2)
+            # #t_inverse = 1.0 / self.config['physics_world_step_size']
+            # yaw_rate_diff = np.abs((diff_theta_2 - diff_theta_1)) * t_inverse * t_inverse
+            yaw_rate_diff_list.append(steer_rate)
+        return yaw_rate_diff_list 
+
 
     def update_current_state(self, vehicle_id):
         vehicle = self.vehicles[vehicle_id]

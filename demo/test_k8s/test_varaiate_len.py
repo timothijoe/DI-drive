@@ -38,7 +38,7 @@ metadrive_basic_config = dict(
     env=dict(
         metadrive=dict(use_render=True,
             show_seq_traj = True,
-            traffic_density = 0.4,
+            traffic_density = 0.3,
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             #map='OSOS', 
@@ -48,7 +48,8 @@ metadrive_basic_config = dict(
             use_lateral=True,
             use_speed_reward = True,
             use_heading_reward = True,
-            use_jerk_reward = True,
+            use_jerk_reward = False,
+            use_steer_rate_reward = True,
             show_interface=False,
             avg_speed=6.5,
             heading_reward = 0.3,
@@ -111,7 +112,7 @@ def wrapped_env(env_cfg, wrapper_cfg=None):
 def main(cfg):
     cfg = compile_config(
         cfg,
-        SyncSubprocessEnvManager,
+        BaseEnvManager,
         SACPolicy,
         BaseLearner,
         SampleSerialCollector,
@@ -120,11 +121,11 @@ def main(cfg):
     )
 
     collector_env_num, evaluator_env_num = cfg.env.collector_env_num, cfg.env.evaluator_env_num
-    collector_env = SyncSubprocessEnvManager(
+    collector_env = BaseEnvManager(
         env_fn=[partial(wrapped_env, cfg.env.metadrive) for _ in range(collector_env_num)],
         cfg=cfg.env.manager,
     )
-    evaluator_env = SyncSubprocessEnvManager(
+    evaluator_env = BaseEnvManager(
         env_fn=[partial(wrapped_env, cfg.env.metadrive) for _ in range(evaluator_env_num)],
         cfg=cfg.env.manager,
     )
@@ -143,8 +144,10 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/v4_var_20k.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/vvv8_iter90k.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june04_ondime10.pth.tar'
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/jun0604_iter50k.pth.tar'
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/jun06_iter20k.pth.tar'
     # dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/before_z1_oneside_dim10.pth.tar'
-    # dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/z4_noone_dim10.pth.tar'
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/z4_noone_dim10.pth.tar'
     
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
