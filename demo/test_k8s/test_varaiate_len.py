@@ -52,6 +52,7 @@ metadrive_basic_config = dict(
             use_steer_rate_reward = True,
             show_interface=False,
             avg_speed=6.5,
+            driving_reward = 0.2,
             heading_reward = 0.3,
             jerk_importance = 0.5,
             run_out_of_time_penalty = 10.0,
@@ -144,7 +145,7 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/v4_var_20k.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/vvv8_iter90k.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june04_ondime10.pth.tar'
-    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/jun0604_iter50k.pth.tar'
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june08_steer.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/jun06_iter20k.pth.tar'
     # dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/before_z1_oneside_dim10.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/z4_noone_dim10.pth.tar'

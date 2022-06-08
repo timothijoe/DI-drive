@@ -134,7 +134,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # steer rate related 
     sr_bias = 1.00, 
-    sr_dominator = 1.50 ,
+    sr_dominator = 1.50,
     sr_importance = 1.0,
 
     use_speed_reward = True,
@@ -429,27 +429,27 @@ class MetaDriveTrajEnv(BaseEnv):
                 steer_rate_penalty = max(np.tanh((steer_rate - self.config["sr_bias"]) / self.config["sr_dominator"]), 0)
                 steer_rate_penalty = self.config["sr_importance"] * steer_rate_penalty 
                 steer_rate_reward -= steer_rate_penalty 
-        reward = driving_reward + speed_reward + heading_reward + jerk_reward 
+        reward = driving_reward + speed_reward + heading_reward + jerk_reward + steer_rate_reward
         # # print('##############################################################')
         # # print('##############################################################')
         # # print('##############################################################')
-        # # print('##############################################################')
-        # print('driving reward: {}'.format(driving_reward))
-        # print('speed reward: {}'.format(speed_reward))
-        # print('heading reward: {}'.format(heading_reward))
-        # print('jerk reward: {}'.format(jerk_reward))
-        # print('steer rate reward: {}'.format(steer_rate_reward))
-        # # print('jerk list: {}'.format(jerk_list))
-        # # print('speed: {}'.format(speed))
-        # # print('##############################################################')
-        # print('reward: {}'.format(reward))
+        # print('##############################################################')
+        print('driving reward: {}'.format(driving_reward))
+        print('speed reward: {}'.format(speed_reward))
+        print('heading reward: {}'.format(heading_reward))
+        print('jerk reward: {}'.format(jerk_reward))
+        print('steer rate reward: {}'.format(steer_rate_reward))
+        # print('jerk list: {}'.format(jerk_list))
+        # print('speed: {}'.format(speed))
+        # print('##############################################################')
+        print('reward: {}'.format(reward))
+        print('##################')
+        # print('jerk list: {}'.format(jerk_list))
         # print('##################')
-        # # print('jerk list: {}'.format(jerk_list))
-        # # print('##################')
-        # print('yaw_diff list: {}'.format(steer_rate_list))
-        # print('self step num: {}'.format(self.step_num))
-        # if self.step_num > 80:
-        #     print('##############################################################')
+        print('yaw_diff list: {}'.format(steer_rate_list))
+        print('self step num: {}'.format(self.step_num))
+        if self.step_num > 80:
+            print('##############################################################')
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
