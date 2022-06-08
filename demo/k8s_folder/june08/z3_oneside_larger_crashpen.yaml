@@ -43,11 +43,11 @@
          resources:
            requests:
              nvidia.com/gpu: 1
-             cpu: 40
+             cpu: 20
              memory: "120Gi"
            limits:
              nvidia.com/gpu: 1
-             cpu: 60
+             cpu: 25
              memory: "150Gi"
          command: ["/bin/bash", "-c",]
          args:
