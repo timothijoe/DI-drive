@@ -58,7 +58,7 @@
            pip install -e .
            cd /mnt/nfs/zhoutong/lattern/xad
            pip install -e .
-           python3 -u /mnt/nfs/zhoutong/lattern/xad/demo/train_k8s/june07/z2_oneside_steer_1_5rwd.py
+           python3 -u /mnt/nfs/zhoutong/lattern/xad/demo/train_k8s/june08/z2_oneside_steer_1_5rwd.py
          volumeMounts:
          - name: work-dir
            mountPath: /mnt/nfs/zhoutong
