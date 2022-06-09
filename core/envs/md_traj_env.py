@@ -206,8 +206,9 @@ class MetaDriveTrajEnv(BaseEnv):
         self.episode_steps += 1
         if isinstance(actions, dict):
             actions = actions['traj']
-        if actions[11,1] == -1.0:
-            actions = actions[:11,:]
+        if len(actions) > 11:
+            if actions[11,1] == -1.0:
+                actions = actions[:11,:]
         # else: 
         #     actions = actions[:11,:]
         #print(actions.shape)
