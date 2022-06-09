@@ -52,11 +52,14 @@ metadrive_basic_config = dict(
             use_steer_rate_reward = True,
             show_interface=False,
             avg_speed=6.5,
-            driving_reward = 0.2,
-            heading_reward = 0.3,
+            driving_reward = 0.2, # 0.1
+            speed_reward = 0.1, 
+            heading_reward = 0.15, # 0.20
             jerk_importance = 0.5,
+            sr_importance = 1.0,
             run_out_of_time_penalty = 10.0,
-            extra_heading_penalty = False,
+            extra_heading_penalty = True,
+            print_debug_info = True,
             # const_episode_max_step = True,
             # episode_max_step = 250,
         ),
@@ -145,7 +148,10 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/v4_var_20k.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/may28/vvv8_iter90k.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june04_ondime10.pth.tar'
-    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june08_steer.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june09_v2_1.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june09_v2_2.pth.tar'
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june09_v3_1.pth.tar'
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june09_v1_1.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/jun06_iter20k.pth.tar'
     # dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/before_z1_oneside_dim10.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/z4_noone_dim10.pth.tar'
@@ -160,7 +166,7 @@ def main(cfg):
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
     evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
-    for iter in range(10):
+    for iter in range(20):
         stop, reward = evaluator.eval()
     evaluator.close()
 

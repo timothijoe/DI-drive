@@ -141,6 +141,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     use_heading_reward = False,
     use_jerk_reward = False,
     use_steer_rate_reward = False,
+    print_debug_info = False,
 )
 
 
@@ -207,6 +208,8 @@ class MetaDriveTrajEnv(BaseEnv):
             actions = actions['traj']
         if actions[11,1] == -1.0:
             actions = actions[:11,:]
+        # else: 
+        #     actions = actions[:11,:]
         #print(actions.shape)
 
         macro_actions = self._preprocess_macro_waypoints(actions)
@@ -379,7 +382,8 @@ class MetaDriveTrajEnv(BaseEnv):
         # # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
         if self.config["use_lateral"]:
             avg_lateral_cum = self.compute_avg_lateral_cum(vehicle, current_lane)
-            lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            lateral_factor = clip(1 - 1.0 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            #lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
             #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
         else:
             lateral_factor = 1.0
@@ -410,8 +414,11 @@ class MetaDriveTrajEnv(BaseEnv):
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
             for heading_error in heading_error_list:
                 heading_reward += self.config["heading_reward"] * (0 - np.abs(heading_error)) 
-            if self.config['extra_heading_penalty']:
-                heading_reward += 5 * self.config['heading_reward'] * (0 - np.abs(heading_error_list[-1]))      
+                if self.config['extra_heading_penalty']:
+                    heading_reward += self.config['heading_reward'] * (0 - np.abs(heading_error_list[-1])) 
+            # if self.config['extra_heading_penalty']:
+            #     heading_reward += 10 * self.config['heading_reward'] * (0 - np.abs(heading_error_list[-1])) 
+        #jerk_list = self.compute_jerk_list(vehicle)     
         if self.config["use_jerk_reward"]:
             jerk_list = self.compute_jerk_list(vehicle)
             #yaw_diff_list = self.compute_yaw_rate_diff(vehicle)
@@ -429,27 +436,28 @@ class MetaDriveTrajEnv(BaseEnv):
                 steer_rate_penalty = max(np.tanh((steer_rate - self.config["sr_bias"]) / self.config["sr_dominator"]), 0)
                 steer_rate_penalty = self.config["sr_importance"] * steer_rate_penalty 
                 steer_rate_reward -= steer_rate_penalty 
-        reward = driving_reward + speed_reward + heading_reward + jerk_reward + steer_rate_reward
+        reward = driving_reward + speed_reward + heading_reward + steer_rate_reward + jerk_reward
+        #reward1 = reward + jerk_reward
         # # print('##############################################################')
         # # print('##############################################################')
         # # print('##############################################################')
         # print('##############################################################')
-        print('driving reward: {}'.format(driving_reward))
-        print('speed reward: {}'.format(speed_reward))
-        print('heading reward: {}'.format(heading_reward))
-        print('jerk reward: {}'.format(jerk_reward))
-        print('steer rate reward: {}'.format(steer_rate_reward))
-        # print('jerk list: {}'.format(jerk_list))
-        # print('speed: {}'.format(speed))
-        # print('##############################################################')
-        print('reward: {}'.format(reward))
-        print('##################')
-        # print('jerk list: {}'.format(jerk_list))
-        # print('##################')
-        print('yaw_diff list: {}'.format(steer_rate_list))
-        print('self step num: {}'.format(self.step_num))
-        if self.step_num > 80:
-            print('##############################################################')
+        if self.config['print_debug_info']:
+            print('driving reward: {}'.format(driving_reward))
+            print('speed reward: {}'.format(speed_reward))
+            print('heading reward: {}'.format(heading_reward))
+            #print('jerk reward: {}'.format(jerk_reward))
+            print('steer rate reward: {}'.format(steer_rate_reward))
+            print('speed: {}'.format(speed))
+            # print('##############################################################')
+            print('reward: {}'.format(reward))
+            print('##################')
+            # print('jerk list: {}'.format(jerk_list))
+            # print('##################')
+            print('yaw_diff list: {}'.format(steer_rate_list))
+            print('self step num: {}'.format(self.step_num))
+            if self.step_num > 80:
+                print('##############################################################')
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
@@ -588,7 +596,7 @@ class MetaDriveTrajEnv(BaseEnv):
             speed_list.append(speed)
         return speed_list
 
-    def compute_avg_lateral_cum(self, vehicle, lane):
+    def compute_avg_lateral_cum_old(self, vehicle, lane):
         # Compute lateral distance for each wp
         # average the factor by seq traj len
         # For example, if traj len is 10, then i = 1, 2, ... 10
@@ -598,6 +606,20 @@ class MetaDriveTrajEnv(BaseEnv):
             long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
             lateral_cum += np.abs(lateral_now)
         avg_lateral_cum = lateral_cum / float(len(vehicle.traj_wp_list) - 1) #float(self.config['seq_traj_len'])
+        return avg_lateral_cum
+
+    def compute_avg_lateral_cum(self, vehicle, lane):
+        # Compute lateral distance for each wp
+        # average the factor by seq traj len
+        # For example, if traj len is 10, then i = 1, 2, ... 10
+        # lateral_cum = 0
+        # #for i in range(1, self.config['seq_traj_len'] + 1):
+        # for i in range(1, len(vehicle.traj_wp_list)):
+        #     long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
+        #     lateral_cum += np.abs(lateral_now)
+        # avg_lateral_cum = lateral_cum / float(len(vehicle.traj_wp_list) - 1) #float(self.config['seq_traj_len'])
+        long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[-1]['position'])
+        avg_lateral_cum = lateral_now 
         return avg_lateral_cum
 
     def switch_to_third_person_view(self) -> None:
@@ -771,7 +793,8 @@ class MetaDriveTrajEnv(BaseEnv):
         self.engine.after_step()
         o = None
         o_reset = None
-        print('episode reward: {}'.format(self.episode_rwd))
+        if self.episode_rwd > 0.0:
+            print('episode reward: {}'.format(self.episode_rwd))
         self.episode_rwd = 0
         self.step_num = 0
         for v_id, v in self.vehicles.items():
