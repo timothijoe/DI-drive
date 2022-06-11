@@ -1,7 +1,7 @@
  apiVersion: diengine.opendilab.org/v2alpha1
  kind: DIJob
  metadata:
-   name: a4-lem10
+   name: a4-fp4-june11
  spec:
    group: "base"  # 标记job所属的group
    priority: "normal"  # 表示job的优先级，保留字段，调度中或许可以用到
@@ -58,7 +58,7 @@
            pip install -e .
            cd /mnt/nfs/zhoutong/lattern/xad
            pip install -e .
-           python3 -u /mnt/nfs/zhoutong/lattern/xad/demo/train_k8s/june09/z4_len10.py
+           python3 -u /mnt/nfs/zhoutong/lattern/xad/demo/train_k8s/june11/z4_fp_v4.py
          volumeMounts:
          - name: work-dir
            mountPath: /mnt/nfs/zhoutong
