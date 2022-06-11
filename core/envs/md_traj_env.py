@@ -90,6 +90,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     driving_reward=0.1,
     speed_reward=0.2,
     heading_reward = 0.3, 
+    theta_diff_reward = 1.0,
     extra_heading_penalty = False,
 
 
@@ -141,6 +142,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     use_heading_reward = False,
     use_jerk_reward = False,
     use_steer_rate_reward = False,
+    use_theta_diff_reward = False,
     print_debug_info = False,
 )
 
@@ -395,6 +397,7 @@ class MetaDriveTrajEnv(BaseEnv):
         heading_reward = 0.0
         jerk_reward = 0.0 
         steer_rate_reward = 0.0
+        theta_diff_reward = 0.0
         # Generally speaking, driving reward is a necessity
         driving_reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
         # # Speed reward
@@ -437,7 +440,13 @@ class MetaDriveTrajEnv(BaseEnv):
                 steer_rate_penalty = max(np.tanh((steer_rate - self.config["sr_bias"]) / self.config["sr_dominator"]), 0)
                 steer_rate_penalty = self.config["sr_importance"] * steer_rate_penalty 
                 steer_rate_reward -= steer_rate_penalty 
-        reward = driving_reward + speed_reward + heading_reward + steer_rate_reward + jerk_reward
+            
+        if self.config["use_theta_diff_reward"]:
+            theta_diff_list = self.compute_theta_diff_list(vehicle)
+            for theta_diff in theta_diff_list:
+                theta_diff_reward += self.config["theta_diff_reward"] * (0 - np.abs(theta_diff))
+
+        reward = driving_reward + speed_reward + heading_reward + steer_rate_reward + theta_diff_reward +  jerk_reward
         #reward1 = reward + jerk_reward
         # # print('##############################################################')
         # # print('##############################################################')
@@ -449,13 +458,15 @@ class MetaDriveTrajEnv(BaseEnv):
             print('heading reward: {}'.format(heading_reward))
             #print('jerk reward: {}'.format(jerk_reward))
             print('steer rate reward: {}'.format(steer_rate_reward))
+            print('theta diff reward: {}'.format(theta_diff_reward))
             print('speed: {}'.format(speed))
             # print('##############################################################')
             print('reward: {}'.format(reward))
             print('##################')
             # print('jerk list: {}'.format(jerk_list))
             # print('##################')
-            print('yaw_diff list: {}'.format(steer_rate_list))
+            print('steering rate list: {}'.format(steer_rate_list))
+            print('theta diff list: {}'.format(theta_diff_list))
             print('self step num: {}'.format(self.step_num))
             if self.step_num > 80:
                 print('##############################################################')
@@ -562,6 +573,18 @@ class MetaDriveTrajEnv(BaseEnv):
             # yaw_rate_diff = np.abs((diff_theta_2 - diff_theta_1)) * t_inverse * t_inverse
             yaw_rate_diff_list.append(steer_rate)
         return yaw_rate_diff_list 
+
+    def compute_theta_diff_list(self, vehicle):
+        theta_diff_list = []
+        for i in range(1, len(vehicle.traj_wp_list)):
+            theta_t0 = vehicle.traj_wp_list[i-1]['yaw']
+            theta_t1 = vehicle.traj_wp_list[i]['yaw']
+            diff_theta = theta_t1 - theta_t0
+            diff_theta  = np.abs(self.wrap_angle(diff_theta))
+            theta_diff_list.append(diff_theta)
+
+        return theta_diff_list
+
 
 
     def update_current_state(self, vehicle_id):
