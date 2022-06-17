@@ -35,6 +35,7 @@ class VaeDecoder(nn.Module):
         # input: h_dim, output: throttle, steer
         self.hidden2control = nn.Linear(self.h_dim, 2)
         self.decoder = nn.LSTM(self.embedding_dim, self.h_dim, self.num_layers)
+        self.decoder_len10 = nn.LSTM(self.embedding_dim, self.h_dim, self.num_layers)
         self.init_hidden_decoder = torch.nn.Linear(in_features = self.latent_dim, out_features = self.h_dim * self.num_layers)
         self.one_side_class_vae = one_side_class_vae
         label_dims = [self.h_dim, self.h_dim, self.h_dim, self.label_dim]
@@ -186,14 +187,75 @@ class VaeDecoder(nn.Module):
         #current_state = torch.FloatTensor([x_t, y_t, psi_t, v_t_1])
         return current_state, steering_batch
 
+    # def decode(self, z, init_state):
+    #     generated_traj = []
+    #     prev_state = init_state 
+    #     if self.one_side_class_vae:
+    #         output_label = self.label_classification(z[:,:1])
+    #     else:
+    #         output_label = self.label_classification(z[:,:])
+    #     #output_label = F.softmax(output_label, dim=2)
+    #     # decoder_input shape: batch_size x 4
+    #     decoder_input = self.spatial_embedding(prev_state)
+    #     decoder_input = decoder_input.view(1, -1 , self.embedding_dim)
+    #     decoder_h = self.init_hidden_decoder(z)
+    #     if len(decoder_h.shape) == 2:
+    #         decoder_h = torch.unsqueeze(decoder_h, 0)
+    #         #decoder_h.unsqueeze(0)
+    #     decoder_h = (decoder_h, decoder_h)
+    #     last_st = None
+    #     for _ in range(self.seq_len):
+    #         # output shape: 1 x batch x h_dim
+    #         output, decoder_h = self.decoder(decoder_input, decoder_h)
+    #         control = self.hidden2control(output.view(-1, self.h_dim))
+    #         curr_state, steering_batch = self.plant_model_batch(prev_state, control[:,0], control[:,1], self.dt, last_st, 0.5)
+    #         generated_traj.append(curr_state)
+    #         decoder_input = self.spatial_embedding(curr_state)
+    #         decoder_input = decoder_input.view(1, -1, self.embedding_dim)
+    #         prev_state = curr_state 
+    #         last_st = steering_batch
+    #     generated_traj = torch.stack(generated_traj, dim = 1)
+    #     return generated_traj, output_label
+
     def decode(self, z, init_state):
-        generated_traj = []
-        prev_state = init_state 
         if self.one_side_class_vae:
             output_label = self.label_classification(z[:,:1])
         else:
             output_label = self.label_classification(z[:,:])
-        #output_label = F.softmax(output_label, dim=2)
+        generated_traj = self.decode_len20(z, init_state)
+        generated_traj_len10 = self.decode_len10(z, init_state)
+        return generated_traj, generated_traj_len10, output_label
+
+    def decode_len10(self, z, init_state):
+        generated_traj = []
+        prev_state = init_state
+        # decoder_input shape: batch_size x 4
+        decoder_input = self.spatial_embedding(prev_state)
+        decoder_input = decoder_input.view(1, -1 , self.embedding_dim)
+        decoder_h = self.init_hidden_decoder(z)
+        if len(decoder_h.shape) == 2:
+            decoder_h = torch.unsqueeze(decoder_h, 0)
+            #decoder_h.unsqueeze(0)
+        decoder_h = (decoder_h, decoder_h)
+        last_st = None
+        for _ in range(10):
+            # output shape: 1 x batch x h_dim
+            output, decoder_h = self.decoder_len10(decoder_input, decoder_h)
+            control = self.hidden2control(output.view(-1, self.h_dim))
+            #last_st = None 
+            curr_state, steering_batch = self.plant_model_batch(prev_state, control[:,0], control[:,1], self.dt, last_st, 0.5)
+            generated_traj.append(curr_state)
+            decoder_input = self.spatial_embedding(curr_state)
+            decoder_input = decoder_input.view(1, -1, self.embedding_dim)
+            prev_state = curr_state 
+            last_st = steering_batch
+        generated_traj = torch.stack(generated_traj, dim = 1)
+        return generated_traj
+
+
+    def decode_len20(self, z, init_state):
+        generated_traj = []
+        prev_state = init_state
         # decoder_input shape: batch_size x 4
         decoder_input = self.spatial_embedding(prev_state)
         decoder_input = decoder_input.view(1, -1 , self.embedding_dim)
@@ -207,6 +269,7 @@ class VaeDecoder(nn.Module):
             # output shape: 1 x batch x h_dim
             output, decoder_h = self.decoder(decoder_input, decoder_h)
             control = self.hidden2control(output.view(-1, self.h_dim))
+            #last_st = None
             curr_state, steering_batch = self.plant_model_batch(prev_state, control[:,0], control[:,1], self.dt, last_st, 0.5)
             generated_traj.append(curr_state)
             decoder_input = self.spatial_embedding(curr_state)
@@ -214,13 +277,17 @@ class VaeDecoder(nn.Module):
             prev_state = curr_state 
             last_st = steering_batch
         generated_traj = torch.stack(generated_traj, dim = 1)
-        return generated_traj, output_label
+        return generated_traj
 
 
     def forward(self, z, init_state):
-        generated_traj, output_label = self.decode(z, init_state)
+        generated_traj, generated_traj_10, output_label = self.decode(z, init_state)
         traj_len_index = torch.argmax(output_label, dim = 1)
         if traj_len_index[0] == 0:
+            uni_traj = torch.zeros_like(generated_traj)
+            uni_traj[:, :10, :] = generated_traj_10
             #generated_traj = generated_traj[:,:10,:]
-            generated_traj[:,10:,:] = -1.0
+            uni_traj[:,10:,:] = -1.0
+        else:
+            uni_traj = generated_traj
         return generated_traj

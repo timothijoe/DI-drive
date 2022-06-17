@@ -18,20 +18,20 @@ from core.policy.hrl_policy.traj_sac import TrajSAC
 from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 
-ONE_SIDE_CLASS_VAE = True
-LATENT_DIM = 10
+ONE_SIDE_CLASS_VAE = False
+LATENT_DIM = 3
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
 SEQ_TRAJ_LEN = 20
 
 if ONE_SIDE_CLASS_VAE:
     if LATENT_DIM == 3:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/var_len_zdim3_oneside_ckpt'
-        VAE_LOAD_DIR = 'traj_model/variate_len_dim3_v2_oneside_ckpt'
+        #VAE_LOAD_DIR = 'traj_model/variate_len_dim3_v2_oneside_ckpt'
     else:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/var_len_zdim10_oneside_ckpt'
 else:
     if LATENT_DIM == 3:
-        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/variate_len_dim3_noone_ckpt'
+        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/multi_head_dim3_ckpt'
     else:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/variate_len_dim10_noone_ckpt'    
 
@@ -57,9 +57,9 @@ metadrive_basic_config = dict(
             avg_speed=6.5,
             driving_reward = 0.2, # 0.1
             speed_reward = 0.1, 
-            heading_reward = 0.15, # 0.20
-            jerk_importance = 0.5,
-            sr_importance = 1.0,
+            heading_reward = 0.10, # 0.20
+            jerk_importance = 0.8,
+            sr_importance = 0.8,
             run_out_of_time_penalty = 10.0,
             extra_heading_penalty = True,
             print_debug_info = True,
@@ -156,6 +156,9 @@ def main(cfg):
     # dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/jun09_v2_1.pth.tar'
     # dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/z5_june07.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june09_11_v2_1.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june13_v4_1.pth.tar'
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june12_v3_1.pth.tar'
+    #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june12_v4_2.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june09_v3_1.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/june09_v1_1.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/jun06_iter20k.pth.tar'
@@ -165,11 +168,8 @@ def main(cfg):
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
-    policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load(dir))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/acc_full_reward/iteration_50000.pth.tar', map_location = 'cpu'))
-    #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march13/ours_no_lateral/iteration_40000.pth.tar', map_location = 'cpu'))
+    
+    #policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
    # evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)

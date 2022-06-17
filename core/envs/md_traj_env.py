@@ -90,7 +90,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     driving_reward=0.1,
     speed_reward=0.2,
     heading_reward = 0.3, 
-    theta_diff_reward = 1.0,
+    theta_diff_reward = 0.5,
     extra_heading_penalty = False,
 
 
