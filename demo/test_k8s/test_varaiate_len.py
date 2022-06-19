@@ -164,12 +164,16 @@ def main(cfg):
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/jun06_iter20k.pth.tar'
     # dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/before_z1_oneside_dim10.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/z4_noone_dim10.pth.tar'
+
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june17_v_1.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june17_v2_1.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june19_v2_1.pth.tar'
     
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
     
-    #policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
+    policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
     tb_logger = SummaryWriter('./log/{}/'.format(cfg.exp_name))
    # evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     evaluator = MetadriveEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
