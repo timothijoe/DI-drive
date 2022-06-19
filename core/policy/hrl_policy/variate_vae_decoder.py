@@ -290,4 +290,4 @@ class VaeDecoder(nn.Module):
             uni_traj[:,10:,:] = -1.0
         else:
             uni_traj = generated_traj
-        return generated_traj
+        return uni_traj #generated_traj
