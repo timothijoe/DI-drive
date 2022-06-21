@@ -404,15 +404,21 @@ class MetaDriveTrajEnv(BaseEnv):
         if self.config["use_speed_reward"]:
             max_spd = 10
             speed_list = self.compute_speed_list(vehicle)
-            for speed in speed_list: 
-                if speed < self.config['speed_bias']:
-                    speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['low_spd_rwd_scale']
-                else:
-                    speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['high_spd_rwd_scale']
+            #avg_speed = np.mean(speed_list)
+            avg_speed = speed_list[-1]
+            if avg_speed >= self.config['speed_bias']:
+                speed_reward = self.config['speed_reward']
+            else:
+                speed_reward = self.config['speed_reward'] * avg_speed / self.config['speed_bias']
+            # for speed in speed_list: 
+            #     if speed < self.config['speed_bias']:
+            #         speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['low_spd_rwd_scale']
+            #     else:
+            #         speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['high_spd_rwd_scale']
 
-                # speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
-                # if speed < self.avg_speed:
-                #     speed_reward -= 0.08 #0.06
+            #     # speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
+            #     # if speed < self.avg_speed:
+            #     #     speed_reward -= 0.08 #0.06
         if self.config["use_heading_reward"]:
             # Heading Reward
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
@@ -459,14 +465,15 @@ class MetaDriveTrajEnv(BaseEnv):
             #print('jerk reward: {}'.format(jerk_reward))
             print('steer rate reward: {}'.format(steer_rate_reward))
             print('theta diff reward: {}'.format(theta_diff_reward))
-            print('speed: {}'.format(speed))
+            print('speed: {}'.format(avg_speed))
             # print('##############################################################')
             print('reward: {}'.format(reward))
             print('##################')
             # print('jerk list: {}'.format(jerk_list))
             # print('##################')
-            print('steering rate list: {}'.format(steer_rate_list))
-            print('theta diff list: {}'.format(theta_diff_list))
+
+            # print('steering rate list: {}'.format(steer_rate_list))
+            # print('theta diff list: {}'.format(theta_diff_list))
             print('self step num: {}'.format(self.step_num))
             if self.step_num > 80:
                 print('##############################################################')
@@ -850,6 +857,9 @@ class MetaDriveTrajEnv(BaseEnv):
                 v.macro_succ = False
             if hasattr(v, 'macro_crash'):
                 v.macro_crash = False
+            if hasattr(v, 'crash_index'):
+                v.crash_index = -1
+                v.crash_total_len = -1
             v.penultimate_state = {}
             v.penultimate_state['position'] = np.array([0,0])
             v.penultimate_state['yaw'] = 0 

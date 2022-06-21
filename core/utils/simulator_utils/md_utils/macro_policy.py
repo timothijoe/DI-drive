@@ -199,12 +199,19 @@ class ManualMacroDiscretePolicy(BasePolicy):
             #print('arrive dest zt')
         if (self.control_object.crash_vehicle and hasattr(self.control_object, 'crash_vehicle')):
             self.control_object.macro_crash = True
+            if self.control_object.crash_index == -1:
+                self.control_object.crash_index = self.control_object.last_crash_index
+                self.control_object.crash_total_len = self.control_object.last_crash_total_len 
 
         #print('vel: {}'.format(self.control_object.velocity))
         if (len(args) >= 2):
             macro_action = args[1]
         frame = args[1]
         wp_list = args[2]
+
+        self.control_object.last_crash_index = frame
+        self.control_object.last_crash_total_len = len(wp_list) - 1
+
         #print('waypoint list initial: {}, {}'.format(wp_list[0][0], wp_list[0][1]))
         ego_vehicle = self.control_object
         if frame ==0:

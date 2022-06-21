@@ -11,6 +11,10 @@ class MacroDefaultVehicle(DefaultVehicle):
         super(MacroDefaultVehicle, self).__init__(vehicle_config, name, random_seed)
         self.macro_succ = False
         self.macro_crash = False
+        self.crash_index = -1
+        self.last_crash_index = -1
+        self.crash_total_len = -1
+        self.last_crash_total_len = -1
         self.last_spd = 0
         self.last_macro_position = self.last_position
         self.v_wps = [[0,0], [1,1]]

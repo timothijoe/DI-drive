@@ -36,8 +36,12 @@ class VaeDecoder(nn.Module):
         self.hidden2control = nn.Linear(self.h_dim, 2)
         self.decoder = nn.LSTM(self.embedding_dim, self.h_dim, self.num_layers)
         self.decoder_len10 = nn.LSTM(self.embedding_dim, self.h_dim, self.num_layers)
-        self.init_hidden_decoder = torch.nn.Linear(in_features = self.latent_dim, out_features = self.h_dim * self.num_layers)
+        #self.init_hidden_decoder = torch.nn.Linear(in_features = self.latent_dim, out_features = self.h_dim * self.num_layers)
         self.one_side_class_vae = one_side_class_vae
+        if self.one_side_class_vae:
+            self.init_hidden_decoder = torch.nn.Linear(in_features = self.latent_dim-1, out_features = self.h_dim * self.num_layers)
+        else:
+            self.init_hidden_decoder = torch.nn.Linear(in_features = self.latent_dim, out_features = self.h_dim * self.num_layers)
         label_dims = [self.h_dim, self.h_dim, self.h_dim, self.label_dim]
         label_modules = []
         #in_channels = self.latent_dim
@@ -220,10 +224,15 @@ class VaeDecoder(nn.Module):
     def decode(self, z, init_state):
         if self.one_side_class_vae:
             output_label = self.label_classification(z[:,:1])
+            generated_traj = self.decode_len20(z[:,1:], init_state)
+            generated_traj_len10 = self.decode_len10(z[:,1:], init_state)
+
         else:
             output_label = self.label_classification(z[:,:])
-        generated_traj = self.decode_len20(z, init_state)
-        generated_traj_len10 = self.decode_len10(z, init_state)
+            generated_traj = self.decode_len20(z, init_state)
+            generated_traj_len10 = self.decode_len10(z, init_state)
+        # generated_traj = self.decode_len20(z, init_state)
+        # generated_traj_len10 = self.decode_len10(z, init_state)
         return generated_traj, generated_traj_len10, output_label
 
     def decode_len10(self, z, init_state):
@@ -283,11 +292,11 @@ class VaeDecoder(nn.Module):
     def forward(self, z, init_state):
         generated_traj, generated_traj_10, output_label = self.decode(z, init_state)
         traj_len_index = torch.argmax(output_label, dim = 1)
-        if traj_len_index[0] == 0:
+        if traj_len_index[0] == 0: #0
             uni_traj = torch.zeros_like(generated_traj)
             uni_traj[:, :10, :] = generated_traj_10
             #generated_traj = generated_traj[:,:10,:]
             uni_traj[:,10:,:] = -1.0
         else:
             uni_traj = generated_traj
-        return uni_traj #generated_traj
+        return uni_traj

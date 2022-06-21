@@ -29,7 +29,7 @@ VAE_LOAD_DIR = 'traj_model/mh_v2_dim3_ckpt'
 # origin version
 metadrive_basic_config = dict(
     #exp_name = 'z1_jun09_final_point_v1',
-    exp_name = 'z6_june20_mh_neh',
+    exp_name = 'z8_june21_mh_eh',
     env=dict(
         metadrive=dict(use_render=False,
             show_seq_traj = False,
@@ -46,15 +46,15 @@ metadrive_basic_config = dict(
             use_jerk_reward = False,
             use_steer_rate_reward = True,
             use_theta_diff_reward = True,
-            sr_importance = 0.8, 
-            heading_reward = 0.30,
-            driving_reward = 0.20,
-            speed_reward = 0.10,
             run_out_of_time_penalty = 10.0,
             crash_vehicle_penalty = 10.0,
-            crash_object_penalty = 10.0,
-            out_of_road_penalty = 10.0,
             extra_heading_penalty = False,
+            speed_bias = 3.5, 
+            speed_reward = 0.4,
+            driving_reward = 0.05, 
+            heading_reward = 0.1, # 0.20
+            sr_importance = 0.2,
+            theta_diff_reward = 0.1, 
         ),
         manager=dict(
             shared_memory=False,

@@ -26,12 +26,16 @@ SEQ_TRAJ_LEN = 20
 if ONE_SIDE_CLASS_VAE:
     if LATENT_DIM == 3:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/var_len_zdim3_oneside_ckpt'
+        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/Trajectory_VAE/result/June21-2/ckpt/99_decoder_ckpt'
+        # VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/mh_v2_dim3_ckpt'
         #VAE_LOAD_DIR = 'traj_model/variate_len_dim3_v2_oneside_ckpt'
     else:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/var_len_zdim10_oneside_ckpt'
 else:
     if LATENT_DIM == 3:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/multi_head_dim3_ckpt'
+        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/mh_v2_dim3_ckpt'
+        #VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/Trajectory_VAE/result/June21-2/ckpt/99_decoder_ckpt'
     else:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/drive_project/ckpt/june04/variate_len_dim10_noone_ckpt'    
 
@@ -55,14 +59,21 @@ metadrive_basic_config = dict(
             use_theta_diff_reward = True,
             show_interface=False,
             avg_speed=6.5,
-            driving_reward = 0.2, # 0.1
-            speed_reward = 0.1, 
-            heading_reward = 0.10, # 0.20
-            jerk_importance = 0.8,
-            sr_importance = 0.8,
+            #driving_reward = 0.2, # 0.1 # 0.05
+            # speed_reward = 0.1,   
+            #heading_reward = 0.10, # 0.20
+            #jerk_importance = 0.8,
+            #sr_importance = 0.8,
             run_out_of_time_penalty = 10.0,
             extra_heading_penalty = True,
             print_debug_info = True,
+            speed_bias = 3.5, 
+            speed_reward = 0.4,
+            driving_reward = 0.05, 
+            heading_reward = 0.03, # 0.20
+            sr_importance = 0.2,
+            theta_diff_reward = 0.1, 
+
             # const_episode_max_step = True,
             # episode_max_step = 250,
         ),
@@ -168,6 +179,8 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june17_v_1.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june17_v2_1.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june19_v2_1.pth.tar'
+
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june20_v1_1.pth.tar'
     
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
