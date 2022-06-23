@@ -18,7 +18,7 @@ from core.policy.hrl_policy.traj_sac import TrajSAC
 from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 
-ONE_SIDE_CLASS_VAE = False
+ONE_SIDE_CLASS_VAE = True 
 LATENT_DIM = 3
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
 SEQ_TRAJ_LEN = 20
@@ -68,8 +68,8 @@ metadrive_basic_config = dict(
             extra_heading_penalty = True,
             print_debug_info = True,
             speed_bias = 3.5, 
-            speed_reward = 0.4,
-            driving_reward = 0.05, 
+            speed_reward = 0.05,
+            driving_reward = 0.10, 
             heading_reward = 0.03, # 0.20
             sr_importance = 0.2,
             theta_diff_reward = 0.1, 
@@ -181,6 +181,8 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june19_v2_1.pth.tar'
 
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june20_v1_1.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june22_z5_1.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june23_xii_2.pth.tar'
     
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
