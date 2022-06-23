@@ -29,7 +29,7 @@ VAE_LOAD_DIR = 'traj_model/mh_v3_dim3_ckpt'
 # origin version
 metadrive_basic_config = dict(
     #exp_name = 'z1_jun09_final_point_v1',
-    exp_name = 'gt1_june21_mh_eh',
+    exp_name = 'gt3_dim3_gama09_auto',
     env=dict(
         metadrive=dict(use_render=False,
             show_seq_traj = False,
@@ -48,11 +48,11 @@ metadrive_basic_config = dict(
             use_theta_diff_reward = True,
             run_out_of_time_penalty = 10.0,
             crash_vehicle_penalty = 5.0,
-            extra_heading_penalty = True,
+            extra_heading_penalty = False,
             speed_bias = 3.5, 
-            speed_reward = 0.06,
+            speed_reward = 0.05,
             driving_reward = 0.10, 
-            heading_reward = 0.025, # 0.20
+            heading_reward = 0.1, # 0.20
             sr_importance = 0.2,
             theta_diff_reward = 0.1, 
         ),
@@ -80,7 +80,8 @@ metadrive_basic_config = dict(
         ),
         learn=dict(
             update_per_collect=100,
-            auto_alpha = False,
+            auto_alpha = True,
+            discount_factor = 0.9,
             batch_size=64,
             learning_rate=3e-4,
             learner=dict(

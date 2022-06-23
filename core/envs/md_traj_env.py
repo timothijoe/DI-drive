@@ -221,7 +221,7 @@ class MetaDriveTrajEnv(BaseEnv):
         #self.step_num = self.step_num + 1
         if self.config['variate_len_label']:
             self.step_num = self.step_num + len(actions) - 1
-            print('len: {}'.format(len(actions)-1))
+            #print('len: {}'.format(len(actions)-1))
             # print('step num: {}, and total step num is : {}'.format(self.step_num,self.episode_max_step))
         else:
             self.step_num = self.step_num + self.config['seq_traj_len']
@@ -404,7 +404,7 @@ class MetaDriveTrajEnv(BaseEnv):
         if self.config["use_speed_reward"]:
             max_spd = 10
             speed_list = self.compute_speed_list(vehicle)
-            avg_speed = np.mean(speed_list)
+            avg_speed = np.min(speed_list)
             #avg_speed = speed_list[-1]
             # if avg_speed >= self.config['speed_bias']:
             #     speed_reward = self.config['speed_reward']
@@ -414,7 +414,9 @@ class MetaDriveTrajEnv(BaseEnv):
                 if speed < self.config['speed_bias']:
                     speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['low_spd_rwd_scale']
                 else:
-                    speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['high_spd_rwd_scale']
+                    speed_reward += 0 #self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['high_spd_rwd_scale']
+            if avg_speed > self.config['speed_bias']:
+                speed_reward += self.config['speed_reward'] * 5
 
             #     # speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
             #     # if speed < self.avg_speed:
@@ -468,6 +470,7 @@ class MetaDriveTrajEnv(BaseEnv):
             print('speed: {}'.format(avg_speed))
             # print('##############################################################')
             print('reward: {}'.format(reward))
+            print('traj_len: {}'.format(len(speed_list)))
             print('##################')
             # print('jerk list: {}'.format(jerk_list))
             # print('##################')

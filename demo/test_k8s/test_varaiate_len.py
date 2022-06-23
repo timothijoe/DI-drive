@@ -183,6 +183,7 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june20_v1_1.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june22_z5_1.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june23_xii_2.pth.tar'
+    dir ='/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june23_gt2_3.pth.tar'
     
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'
