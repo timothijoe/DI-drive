@@ -19,7 +19,7 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 
 
 ONE_SIDE_CLASS_VAE = True 
-LATENT_DIM = 3
+LATENT_DIM = 3 #3
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
 SEQ_TRAJ_LEN = 20
 
@@ -30,7 +30,7 @@ if ONE_SIDE_CLASS_VAE:
         # VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/mh_v2_dim3_ckpt'
         #VAE_LOAD_DIR = 'traj_model/variate_len_dim3_v2_oneside_ckpt'
     else:
-        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/var_len_zdim10_oneside_ckpt'
+        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/mh_v4_dim10_ckpt'
 else:
     if LATENT_DIM == 3:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/multi_head_dim3_ckpt'
@@ -183,7 +183,9 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june20_v1_1.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june22_z5_1.pth.tar'
     dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june23_xii_2.pth.tar'
-    dir ='/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june23_gt2_3.pth.tar'
+    dir ='/home/SENSETIME/zhoutong/drive_project/ckpt/june11/june24_dim10_1.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/drive_project/log/june25/june25_dim10_v1'
+    dir = '/home/SENSETIME/zhoutong/drive_project/log/june25/june25_gt6_1.pth.tar'
     
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march23/b1_exp3/iteration_60000.pth.tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c1_iteration_40000.pth.tar'

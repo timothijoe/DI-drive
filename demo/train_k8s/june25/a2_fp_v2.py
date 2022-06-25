@@ -29,7 +29,7 @@ VAE_LOAD_DIR = 'traj_model/mh_v4_dim10_ckpt'
 # origin version
 metadrive_basic_config = dict(
     #exp_name = 'z1_jun09_final_point_v1',
-    exp_name = 'gt4_dim10_gama09',
+    exp_name = 'sp2_dim10_gama09',
     env=dict(
         metadrive=dict(use_render=False,
             show_seq_traj = False,
