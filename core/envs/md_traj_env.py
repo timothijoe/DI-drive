@@ -144,6 +144,8 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     use_steer_rate_reward = False,
     use_theta_diff_reward = False,
     print_debug_info = False,
+    use_another_later_cost = False,
+    lateral_weight = 2.0,
 )
 
 
@@ -390,7 +392,12 @@ class MetaDriveTrajEnv(BaseEnv):
             #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
         else:
             lateral_factor = 1.0
-        #     use_lateral_penalty = True
+        
+        if self.config['use_another_later_cost']:
+            lateral_factor = 1.0
+            lateral_penalty = clip(1 - 1.0 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
+            lateral_penalty = 1.0 - lateral_penalty 
+            
         reward = 0.0
         driving_reward = 0.0
         speed_reward = 0.0
@@ -400,6 +407,9 @@ class MetaDriveTrajEnv(BaseEnv):
         theta_diff_reward = 0.0
         # Generally speaking, driving reward is a necessity
         driving_reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
+        if self.config['use_another_later_cost']:
+            driving_reward -= self.config['lateral_weight'] * lateral_penalty 
+
         # # Speed reward
         if self.config["use_speed_reward"]:
             max_spd = 10
