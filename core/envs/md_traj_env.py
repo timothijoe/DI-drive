@@ -129,9 +129,9 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     lateral_scale = 0.25, 
 
     # jerk related 
-    jerk_bias = 15.0, 
-    jerk_dominator = 45.0, #50.0
-    jerk_importance = 0.6, # 0.6
+    jerk_bias = 0.0, #15
+    jerk_dominator = 90.0, #50.0, 45.0
+    jerk_importance = 0.1, # 0.6
 
     # steer rate related 
     sr_bias = 1.00, 
@@ -474,7 +474,7 @@ class MetaDriveTrajEnv(BaseEnv):
             print('driving reward: {}'.format(driving_reward))
             print('speed reward: {}'.format(speed_reward))
             print('heading reward: {}'.format(heading_reward))
-            #print('jerk reward: {}'.format(jerk_reward))
+            print('jerk reward: {}'.format(jerk_reward))
             print('steer rate reward: {}'.format(steer_rate_reward))
             print('theta diff reward: {}'.format(theta_diff_reward))
             print('speed: {}'.format(avg_speed))
@@ -482,7 +482,7 @@ class MetaDriveTrajEnv(BaseEnv):
             print('reward: {}'.format(reward))
             print('traj_len: {}'.format(len(speed_list)))
             print('##################')
-            # print('jerk list: {}'.format(jerk_list))
+            print('jerk list: {}'.format(jerk_list))
             # print('##################')
 
             # print('steering rate list: {}'.format(steer_rate_list))

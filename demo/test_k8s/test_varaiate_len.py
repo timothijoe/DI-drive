@@ -31,6 +31,7 @@ if ONE_SIDE_CLASS_VAE:
         #VAE_LOAD_DIR = 'traj_model/variate_len_dim3_v2_oneside_ckpt'
     else:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/mh_v4_dim10_ckpt'
+        VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/mh_v6_dim10_ckpt'
 else:
     if LATENT_DIM == 3:
         VAE_LOAD_DIR = '/home/SENSETIME/zhoutong/hoffnung/xad/traj_model/multi_head_dim3_ckpt'
@@ -54,7 +55,7 @@ metadrive_basic_config = dict(
             use_lateral=True,
             use_speed_reward = True,
             use_heading_reward = True,
-            use_jerk_reward = False,
+            use_jerk_reward = True,
             use_steer_rate_reward = True,
             use_theta_diff_reward = True,
             show_interface=False,
