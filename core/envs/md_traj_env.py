@@ -122,7 +122,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     variate_len_label = True, # if variate len label is True, const episode max step must be false
     avg_speed = 6.0,
     speed_bias = 4.0,
-    high_spd_rwd_scale = 1.0,
+    high_spd_rwd_scale = 0.0, #origin 1.0
     low_spd_rwd_scale = 2.0,
 
     use_lateral=True,
@@ -424,9 +424,11 @@ class MetaDriveTrajEnv(BaseEnv):
                 if speed < self.config['speed_bias']:
                     speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['low_spd_rwd_scale']
                 else:
-                    speed_reward += 0 #self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['high_spd_rwd_scale']
-            if avg_speed > self.config['speed_bias']:
-                speed_reward += self.config['speed_reward'] * 5
+                    #speed_reward += 0
+                    speed_reward += self.config['speed_reward']*(speed-self.config['speed_bias'])/max_spd*self.config['high_spd_rwd_scale']
+            if self.config['high_spd_rwd_scale'] == 0:
+                if avg_speed > self.config['speed_bias']:
+                    speed_reward += self.config['speed_reward'] * 5
 
             #     # speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road    
             #     # if speed < self.avg_speed:

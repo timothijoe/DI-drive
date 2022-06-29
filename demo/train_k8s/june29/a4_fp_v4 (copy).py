@@ -55,7 +55,6 @@ metadrive_basic_config = dict(
             heading_reward = 0.1, # 0.20
             sr_importance = 0.2,
             theta_diff_reward = 0.1, 
-            high_spd_rwd_scale = 1.0, 
         ),
         manager=dict(
             shared_memory=False,
