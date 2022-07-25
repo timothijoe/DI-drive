@@ -36,7 +36,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
     start_seed=0,
     use_render=False,
-    environment_num=1,
+    environment_num=5,
 
     # ===== Map Config =====
     map='SSSSSSSSSS',  # int or string: an easy way to fill map_config
@@ -422,6 +422,8 @@ class MetaDriveControlEnv(BaseEnv):
             reward = -self.config["crash_object_penalty"]
         elif self.step_num >= self.config["episode_max_step"]:
             reward = - self.config["run_out_of_time_penalty"]
+        # print('reward: {}'.format(reward))
+        # print('speed: {}'.format(speed))
         return reward, step_info
 
     def get_navigation_len(self, vehicle):

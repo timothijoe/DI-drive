@@ -130,11 +130,6 @@ class MetaDriveHRLEnv(BaseEnv):
         global_config = self._post_process_config(merged_config)
         self.config = global_config
 
-        if self.config["seq_traj_len"] == 1:
-            self.config["episode_max_step"] = self.config["episode_max_step"] * 10
-        if self.config["seq_traj_len"] == 20:
-            self.config["episode_max_step"] = self.config["episode_max_step"] // 2
-
         # agent check
         self.num_agents = self.config["num_agents"]
         self.is_multi_agent = self.config["is_multi_agent"]
@@ -169,19 +164,20 @@ class MetaDriveHRLEnv(BaseEnv):
         self.vae_decoder = VaeDecoder(
                 embedding_dim = 64,
                 h_dim = 64,
-                latent_dim = 2,
+                latent_dim = self.config['vae_latent_dim'],
                 seq_len = self.config['seq_traj_len'],
                 dt = 0.1
             )
         # vae_load_dir = 'ckpt_files/a79_decoder_ckpt'
         # vae_load_dir = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_20_79_decoder_ckpt'
-        if self.config['seq_traj_len'] == 10:
-            vae_load_dir = 'ckpt_files/seq_len_10_decoder_ckpt'
-        elif self.config['seq_traj_len'] == 15:
-            vae_load_dir = 'ckpt_files/seq_len_15_78_decoder_ckpt'
-        else:
-            assert self.config['seq_traj_len'] == 20
-            vae_load_dir = 'ckpt_files/seq_len_20_79_decoder_ckpt'
+        vae_load_dir = self.config['VAE_LOAD_DIR']
+        # if self.config['seq_traj_len'] == 10:
+        #     vae_load_dir = 'ckpt_files/seq_len_10_decoder_ckpt'
+        # elif self.config['seq_traj_len'] == 15:
+        #     vae_load_dir = 'ckpt_files/seq_len_15_78_decoder_ckpt'
+        # else:
+        #     assert self.config['seq_traj_len'] == 20
+        #     vae_load_dir = 'ckpt_files/seq_len_20_79_decoder_ckpt'
         self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
         self.vel_speed = 0.0
 

@@ -199,19 +199,12 @@ class ManualMacroDiscretePolicy(BasePolicy):
             #print('arrive dest zt')
         if (self.control_object.crash_vehicle and hasattr(self.control_object, 'crash_vehicle')):
             self.control_object.macro_crash = True
-            if self.control_object.crash_index == -1:
-                self.control_object.crash_index = self.control_object.last_crash_index
-                self.control_object.crash_total_len = self.control_object.last_crash_total_len 
 
         #print('vel: {}'.format(self.control_object.velocity))
         if (len(args) >= 2):
             macro_action = args[1]
         frame = args[1]
         wp_list = args[2]
-
-        self.control_object.last_crash_index = frame
-        self.control_object.last_crash_total_len = len(wp_list) - 1
-
         #print('waypoint list initial: {}, {}'.format(wp_list[0][0], wp_list[0][1]))
         ego_vehicle = self.control_object
         if frame ==0:
@@ -268,11 +261,6 @@ class ManualMacroDiscretePolicy(BasePolicy):
         new_state['yaw'] = heading_theta_at
         new_state['speed'] = ego_vehicle.last_spd
         self.control_object.traj_wp_list.append(new_state)
-
-        # print('frame: {}'.format(frame))
-        # print('wp_list_len: {}'.format(len(self.control_object.traj_wp_list)))
-        # print('control wp_list: {}'.format(self.control_object.traj_wp_list))
-        # print('pen point: {}'.format(self.control_object.penultimate_state))
         #print(ego_vehicle.physics_world_step_size)
         #ego_vehicle.last_spd = norm / 0.03 * 3.6
         #ego_vehicle.set_velocity(heading_theta_at, norm / 0.03 *3.6)

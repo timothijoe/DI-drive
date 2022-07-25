@@ -82,9 +82,9 @@ class DriveEnvWrapper(gym.Wrapper):
         if isinstance(obs, np.ndarray) and len(obs.shape) == 3:
             obs = obs.transpose((2, 0, 1))
         elif isinstance(obs, dict):
-            vehicle_state = obs['vehicle_state']
+            speed = obs['speed']
             birdview = obs['birdview'].transpose((2,0,1))
-            obs = {'vehicle_state': vehicle_state, 'birdview': birdview}
+            obs = {'speed': speed, 'birdview': birdview}
         self._final_eval_reward = 0.0
         self._arrive_dest = False
         return obs
@@ -111,14 +111,13 @@ class DriveEnvWrapper(gym.Wrapper):
         if isinstance(obs, np.ndarray) and len(obs.shape) == 3:
             obs = obs.transpose((2, 0, 1))
         elif isinstance(obs, dict):
-            vehicle_state = obs['vehicle_state']
+            speed = obs['speed']
             birdview = obs['birdview'].transpose((2,0,1))
-            obs = {'vehicle_state': vehicle_state, 'birdview': birdview}
+            obs = {'speed': speed, 'birdview': birdview}
         rew = to_ndarray([rew], dtype=np.float32)
         if done:
             info['final_eval_reward'] = self._final_eval_reward
             info['complete_ratio'] = info['complete_ratio']
-            #print('seq traj len: {}'.format(info['seq_traj_len']))
 
         return BaseEnvTimestep(obs, rew, done, info)
 

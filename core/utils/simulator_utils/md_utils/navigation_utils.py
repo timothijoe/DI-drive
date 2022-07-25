@@ -29,7 +29,7 @@ class HRLNodeNavigation(NodeNetworkNavigation):
 
         #self.drawd = False
         
-        self.LINE_TO_DEST_HEIGHT += 1
+        self.LINE_TO_DEST_HEIGHT += 4
         self.activate_car_pos_marker = False
 
     def _init_trajs(self):
@@ -109,26 +109,21 @@ class HRLNodeNavigation(NodeNetworkNavigation):
         self.current_pos_marker = NodePath(lines.create(False))
         self.current_pos_marker.hide(CamMask.Shadow | CamMask.RgbCam)
         self.current_pos_marker.reparentTo(self.origin)
-        actual_traj_len = self.seq_traj_len
-        if len(wp_list) - 1 < self.seq_traj_len:
-            actual_traj_len = len(wp_list) - 1
-
-        for ii in range(self.seq_traj_len):
+        for i in range(self.seq_traj_len):
             lines = LineSegs()
-            if current_time_step > ii:
+            if current_time_step > i:
                 lines.setColor(1.0, 0.4, 0.0, 0.7)
             else:
                 lines.setColor(0.0, 0.7, 1.0, 0.7)
-            i = ii if ii <= actual_traj_len - 1 else actual_traj_len-1
             #lines.setColor(self.navi_mark_color[0], self.navi_mark_color[1], self.navi_mark_color[2], 0.7)
             #lines.moveTo(panda_position(wp_list[i][0], self.LINE_TO_DEST_HEIGHT+4))
             lines.moveTo(panda_position((wp_list[i][0], wp_list[i][1]), self.LINE_TO_DEST_HEIGHT))
             lines.drawTo(panda_position((wp_list[i+1][0], wp_list[i+1][1]), self.LINE_TO_DEST_HEIGHT))
             lines.setThickness(2)
-            self.__dict__['traj_{}'.format(ii)].removeNode()
-            self.__dict__['traj_{}'.format(ii)] = NodePath(lines.create(False))
-            self.__dict__['traj_{}'.format(ii)].hide(CamMask.Shadow | CamMask.RgbCam)
-            self.__dict__['traj_{}'.format(ii)].reparentTo(self.origin)
+            self.__dict__['traj_{}'.format(i)].removeNode()
+            self.__dict__['traj_{}'.format(i)] = NodePath(lines.create(False))
+            self.__dict__['traj_{}'.format(i)].hide(CamMask.Shadow | CamMask.RgbCam)
+            self.__dict__['traj_{}'.format(i)].reparentTo(self.origin)
 
     def get_waypoint_list(self):
         x = np.arange(0, 50, 0.1)
@@ -188,8 +183,8 @@ class HRLNodeNavigation(NodeNetworkNavigation):
                 if self.activate_car_pos_marker:
                     self.show_car_pos(ego_vehicle.v_wps, ego_vehicle.v_indx)
 
-                # if ego_vehicle.v_indx == 4:
-                #     print('zt')
+                if ego_vehicle.v_indx == 4:
+                    print('zt')
 
             # if ego_vehicle.v_indx == 0:
             #     self.draw_car_path(ego_vehicle.v_wps)
