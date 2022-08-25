@@ -1,36 +1,52 @@
 import os
 import torch
 import numpy as np
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .base_evaluator import BaseEvaluator
 from ding.torch_utils.data_helper import to_tensor
+from ding.utils import build_logger
+from tensorboardX import SummaryWriter
 
 
 class SingleCarlaEvaluator(BaseEvaluator):
     """
-    Carla envaluator used to evaluate a single environment. It is mainly used to visualize the
+    Carla evaluator used to evaluate a single environment. It is mainly used to visualize the
     evaluation results. It uses a environment in DI-engine form and can be rendered in the runtime.
 
     :Arguments:
-            - cfg (Dict): Config dict
-            - env (Any): Carla env, should be in DI-engine form
-            - policy (Any): the policy to pe evaluated
+        - cfg (Dict): Config dict
+        - env (Any): Carla env, should be in DI-engine form
+        - policy (Any): the policy to pe evaluated
+        - exp_name (str, optional): Name of the experiments. Used to build logger. Defaults to 'default_experiment'.
+        - instance_name (str, optional): Name of the evaluator. Used to build logger. Defaults to 'single_evaluator'.
 
-    :Interfaces: reset, eval, close, should_eval
+    :Interfaces: reset, eval, close
+
+    :Properties:
+        - env (BaseDriveEnv): Environment used to evaluate.
+        - policy (Any): Policy instance to interact with envs.
     """
 
     config = dict(
+        # whether calling 'render' each step
         render=False,
-        eval_freq=1000,
+        # whether transform obs into tensor manually
         transform_obs=False,
     )
 
-    def __init__(self, cfg: Dict, env: Any, policy: Any) -> None:
-        super().__init__(cfg, env, policy)
+    def __init__(
+            self,
+            cfg: Dict,
+            env: Any,
+            policy: Any,
+            tb_logger: Optional['SummaryWriter'] = None,  # noqa
+            exp_name: Optional[str] = 'default_experiment',
+            instance_name: Optional[str] = 'single_evaluator',
+    ) -> None:
+        super().__init__(cfg, env, policy, tb_logger=tb_logger, exp_name=exp_name, instance_name=instance_name)
         self._render = self._cfg.render
         self._transform_obs = self._cfg.transform_obs
-        self._last_eval_iter = 0
 
     def close(self) -> None:
         """
@@ -41,21 +57,6 @@ class SingleCarlaEvaluator(BaseEvaluator):
     def reset(self) -> None:
         pass
 
-    def should_eval(self, train_iter: int) -> bool:
-        """
-        Judge if the training iteration is at frequency value to run evaluation.
-
-        :Arguments:
-            - train_iter (int): Current training iteration
-
-        :Returns:
-            bool: Whether should run iteration
-        """
-        if (train_iter - self._last_eval_iter) < self._cfg.eval_freq and train_iter != 0:
-            return False
-        self._last_eval_iter = train_iter
-        return True
-
     def eval(self, reset_param: Dict = None) -> float:
         """
         Running one episode evaluation with provided reset params.
@@ -64,7 +65,7 @@ class SingleCarlaEvaluator(BaseEvaluator):
             - reset_param (Dict, optional): Reset parameter for environment. Defaults to None.
 
         :Returns:
-            float: Evaluation final reward.
+            bool: Whether evaluation succeed.
         """
         self._policy.reset([0])
         eval_reward = 0
@@ -76,14 +77,14 @@ class SingleCarlaEvaluator(BaseEvaluator):
 
         with self._timer:
             while True:
+                if self._render:
+                    self._env.render()
                 if self._transform_obs:
                     obs = to_tensor(obs, dtype=torch.float32)
                 actions = self._policy.forward({0: obs})
                 action = actions[0]['action']
                 timestep = self._env.step(action)
                 obs = timestep.obs
-                if self._render:
-                    self._env.render()
                 if timestep.info.get('abnormal', False):
                     # If there is an abnormal timestep, reset all the related variables(including this env).
                     self._policy.reset(**reset_param)

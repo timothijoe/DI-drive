@@ -12,11 +12,11 @@ from .srunner.scenariomanager.scenario_manager import ScenarioManager
 
 class CarlaScenarioSimulator(CarlaSimulator):
     """
-    Simualtor used to run scenarios in Carla.
+    Simulator used to run scenarios in Carla.
     The simulator loads the config instance of the provided scenario to start simulation.
     It can create hero actor, NPC vehicles, walkers, world map according to it and the
     configuration dict. The modification of sensors and planners, and the running status
-    and informations you can get from it are set the same as ``CarlaSimulator``.
+    and information you can get from it are set the same as ``CarlaSimulator``.
 
     When created, it will set up Carla client and store default configuration the same as
     ``CarlaSimulator``, and it can also be change by the input arguments of the ``init``
@@ -30,7 +30,7 @@ class CarlaScenarioSimulator(CarlaSimulator):
         - host (str, optional): TCP host Carla client link to. Defaults to 'localhost'.
         - port (int, optional): TCP port Carla client link to. Defaults to 9000.
         - tm_port (int, optional): Traffic manager port Carla client link to. Defaults to None.
-        - timeout (float, optional): Carla client link timeout. Defaults to 10.0.
+        - timeout (float, optional): Carla client link timeout. Defaults to 60.0.
 
     :Interfaces:
         init, get_state, get_sensor_data, get_navigation, get_information, apply_control, run_step, clean_up
@@ -41,7 +41,7 @@ class CarlaScenarioSimulator(CarlaSimulator):
         - collided (bool): Whether collided in current episode.
         - end_distance (float): Distance to target in current frame.
         - end_timeout (float): Timeout for entire route provided by planner.
-        - total_diatance (float): Dictance for entire route provided by planner.
+        - total_distance (float): Distance for entire route provided by planner.
         - scenario_manager (Any): Scenario Manager instance used to get running state.
     """
 
@@ -72,7 +72,7 @@ class CarlaScenarioSimulator(CarlaSimulator):
             host: str = 'localhost',
             port: int = 9000,
             tm_port: int = 9050,
-            timeout: float = 10.0,
+            timeout: float = 60.0,
             **kwargs
     ) -> None:
         """
@@ -88,8 +88,8 @@ class CarlaScenarioSimulator(CarlaSimulator):
     def init(self, config: Any) -> None:
         """
         Init simulator episode with provided args.
-        This method takes an scneario configuration instance to set up scenarios in Carla server. the scenario could be
-        a single scenario, or a route scenario together with several scenarios during navigating the route. A scneario
+        This method takes an scenario configuration instance to set up scenarios in Carla server. the scenario could be
+        a single scenario, or a route scenario together with several scenarios during navigating the route. A scenario
         manager is used to manager and check the running status and tick scenarios. A local planner is set to trace the
         route to generate target waypoint and road options in each tick. It will set world, map, vehicles, pedestrians
         dut to provided args and default configs, and reset running status. If no collision happens when creating
@@ -168,7 +168,7 @@ class CarlaScenarioSimulator(CarlaSimulator):
     def run_step(self) -> None:
         """
         Run one step simulation.
-        This will tick Carla world and scenarios, update informations for all sensors and measurement.
+        This will tick Carla world and scenarios, update information for all sensors and measurement.
         """
         if not self._start_scenario:
             self._manager.start_scenario()

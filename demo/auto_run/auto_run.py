@@ -6,7 +6,7 @@ Description:
 from easydict import EasyDict
 from ding.utils import set_pkg_seed
 
-from core.envs import SimpleCarlaEnv, CarlaEnvWrapper
+from core.envs import SimpleCarlaEnv, DriveEnvWrapper
 from core.eval import SingleCarlaEvaluator
 from core.policy import AutoPIDPolicy
 from core.utils.others.tcp_helper import parse_carla_tcp
@@ -40,17 +40,21 @@ autorun_config = dict(
             type='birdview',
             outputs=['show']
         ),
+        wrapper=dict(),
     ),
-    env_wrapper=dict(),
     server=[dict(carla_host='localhost', carla_ports=[9000, 9002, 2])],
-    eval=dict(
-        render=True,
-        reset_param=dict(
-            start=0,
-            end=2,
+    policy=dict(
+        target_speed=40,
+        eval=dict(
+            evaluator=dict(
+                render=True,
+                reset_param=dict(
+                    start=0,
+                    end=2,
+                ),
+            ),
         ),
     ),
-    policy=dict(target_speed=40, ),
 )
 
 main_config = EasyDict(autorun_config)
@@ -60,12 +64,12 @@ def main(cfg, seed=0):
     tcp_list = parse_carla_tcp(cfg.server)
     host, port = tcp_list[0]
 
-    carla_env = CarlaEnvWrapper(SimpleCarlaEnv(cfg.env, host, port), cfg.env_wrapper)
+    carla_env = DriveEnvWrapper(SimpleCarlaEnv(cfg.env, host, port), cfg.env.wrapper)
     carla_env.seed(seed)
     set_pkg_seed(seed)
     auto_policy = AutoPIDPolicy(cfg.policy)
-    evaluator = SingleCarlaEvaluator(cfg.eval, carla_env, auto_policy.eval_mode)
-    evaluator.eval(cfg.eval.reset_param)
+    evaluator = SingleCarlaEvaluator(cfg.policy.eval.evaluator, carla_env, auto_policy.eval_mode)
+    evaluator.eval(cfg.policy.eval.evaluator.reset_param)
     evaluator.close()
 
 

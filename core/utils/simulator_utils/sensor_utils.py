@@ -13,7 +13,7 @@ from collections import deque
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from core.simulators.carla_data_provider import CarlaDataProvider
-from core.utils.others.config_helper import deep_merge_dicts
+from ding.utils.default_helper import deep_merge_dicts
 
 DEFAULT_CAMERA_CONFIG = {
     'size': [384, 160],
@@ -154,8 +154,9 @@ class SensorHelper(object):
         """
         for key in self._sensors_dict:
             if self._sensors_dict[key] is not None:
-                self._sensors_dict[key].stop()
-                self._sensors_dict[key].destroy()
+                if self._sensors_dict[key].is_alive:
+                    self._sensors_dict[key].stop()
+                    self._sensors_dict[key].destroy()
                 self._sensors_dict[key] = None
         time.sleep(0.1)
         self._sensors_dict.clear()

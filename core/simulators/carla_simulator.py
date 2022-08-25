@@ -54,12 +54,12 @@ class CarlaSimulator(BaseSimulator):
     Common Carla Simulator.
     The simulator creates a client to Carla server, and is able to get observation, send
     control signals to the hero vehicle and record essential data from the simulated world.
-    In the intialization period, the simulator may change the environment parameters including
+    In the initialization period, the simulator may change the environment parameters including
     maps and weathers and can add actors (including NPC vehicles, pedestrians as well as sensors
     mounted on the hero vehicle),
     During the running period the simulator will achieve running state and information about
     the hero vehicle (such as running speed, angle, navigation goal and reference path), data
-    from the sensors (such as camera images, lidar points) as well as runnign status(including
+    from the sensors (such as camera images, lidar points) as well as running status(including
     collision, running off road, red light, distance and timeout to end waypoint).
 
     Once it is created, it will set up Carla client and set the parameters in the configuration
@@ -69,7 +69,7 @@ class CarlaSimulator(BaseSimulator):
     The simulator stores and gets some information from a static class ``CarlaDataProvider``
     to avoid frequently sending message to Carla server and speed up.
 
-    Up to now, it uses Carla version 0.9.9.
+    Up to now, it uses Carla version higher than 0.9.9.
 
     If no traffic manager port is provided, it will find random free port in system.
 
@@ -79,7 +79,7 @@ class CarlaSimulator(BaseSimulator):
         - host (str, optional): TCP host Carla client link to. Defaults to 'localhost'.
         - port (int, optional): TCP port Carla client link to. Defaults to 9000.
         - tm_port (int, optional): Traffic manager port Carla client link to. Defaults to None.
-        - timeout (float, optional): Carla client link timeout. Defaults to 10.0.
+        - timeout (float, optional): Carla client link timeout. Defaults to 60.0.
 
     :Interfaces:
         init, get_state, get_sensor_data, get_navigation, get_information, apply_planner,
@@ -91,10 +91,10 @@ class CarlaSimulator(BaseSimulator):
         - collided (bool): Whether collided in current episode.
         - ran_light (bool): Whether ran light in current frame.
         - off_road (bool): Whether ran off road in current frame.
-        - wrong_direction (bool): Whether ran in wrong derection in current frame.
+        - wrong_direction (bool): Whether ran in wrong direction in current frame.
         - end_distance (float): Distance to target in current frame.
         - end_timeout (float): Timeout for entire route provided by planner.
-        - total_diatance (float): Dictance for entire route provided by planner.
+        - total_distance (float): Distance for entire route provided by planner.
     """
     config = dict(
         town='Town01',
@@ -122,7 +122,7 @@ class CarlaSimulator(BaseSimulator):
             host: str = 'localhost',
             port: int = 9000,
             tm_port: Optional[int] = None,
-            timeout: float = 10.0,
+            timeout: float = 60.0,
             **kwargs
     ) -> None:
         """
@@ -215,7 +215,7 @@ class CarlaSimulator(BaseSimulator):
     def init(self, start: int = 0, end: int = 1, **kwargs) -> None:
         """
         Init simulator episode with provided args.
-        This method takes start and end waypoint indexs to set a navigation goal, and will use planner to build a route
+        This method takes start and end waypoint indexes to set a navigation goal, and will use planner to build a route
         to generate target waypoint and road options in each tick. It will set world, map, vehicles, pedestrians dut to
         default config, and provided args, which will be stored to replace old config.
         If no collision happens when creating actors, the init will end and return.
@@ -265,6 +265,8 @@ class CarlaSimulator(BaseSimulator):
             self._world = self._client.load_world(town)
         else:
             self._world = self._client.get_world()
+        if self._world.get_snapshot().timestamp.frame > 1e6:
+            self._world = self._client.load_world(town)
         self._map = self._world.get_map()
         self._set_sync_mode(self._sync_mode, self._delta_seconds)
 
@@ -322,7 +324,8 @@ class CarlaSimulator(BaseSimulator):
 
         for response in self._client.apply_batch_sync(batch, True):
             if response.error:
-                print('[SIMULATOR]', response.error)
+                if self._verbose:
+                    print('[SIMULATOR]', response.error)
             else:
                 CarlaDataProvider.register_actor(self._world.get_actor(response.actor_id))
 
@@ -393,7 +396,7 @@ class CarlaSimulator(BaseSimulator):
             for result in self._client.apply_batch_sync(batch, True):
                 if result.error:
                     if self._verbose:
-                        print('[SIMULATOR] walker controller ', result.error)
+                        print('[SIMULATOR] Walker controller ', result.error)
                 else:
                     _controllers.append(result.actor_id)
 
@@ -408,7 +411,7 @@ class CarlaSimulator(BaseSimulator):
         # wait for a tick to ensure client receives the last transform of the walkers we have just created
         self._world.tick()
 
-        # 5. initialize each controller and set target to walk to (list is [controler, actor, controller, actor ...])
+        # 5. initialize each controller and set target to walk to (list is [controller, actor, controller, actor ...])
         # set how many pedestrians can cross the road
         self._world.set_pedestrians_cross_factor(pedestrians_crossing)
 
@@ -481,8 +484,8 @@ class CarlaSimulator(BaseSimulator):
         for veh in vehicles:
             print('\t', veh[0].id, veh[0].type_id, veh[0].attributes['role_name'])
         print("[SIMULATOR] walkers:", len(walkers))
-        print("[SIMULATOR] lights:", len(traffic_lights))
-        print("[SIMULATOR] speed limits:", len(speed_limits))
+        #print("[SIMULATOR] lights:", len(traffic_lights))
+        #print("[SIMULATOR] speed limits:", len(speed_limits))
         print("[SIMULATOR] sensors:")
         for ss in sensors:
             print('\t', ss[0])
@@ -490,7 +493,7 @@ class CarlaSimulator(BaseSimulator):
 
     def apply_planner(self, end_idx: int) -> Dict:
         """
-        Aplly goal waypoint to planner in simulator. The start point is set to current hero vehicle waypoint.
+        Apply goal waypoint to planner in simulator. The start point is set to current hero vehicle waypoint.
 
         :Arguments:
             - end_idx (int): Index of end waypoint.
@@ -507,7 +510,7 @@ class CarlaSimulator(BaseSimulator):
     def get_state(self) -> Dict:
         """
         Get running state from current world. It contains location, orientation, speed, acc,
-        and the state of surrounding road info suchas traffic light and junction.
+        and the state of surrounding road info such as traffic light and junction.
 
         :Returns:
             Dict: State dict.
@@ -579,7 +582,7 @@ class CarlaSimulator(BaseSimulator):
 
     def get_information(self) -> Dict:
         """
-        Get running information inclution time and ran light counts in current world.
+        Get running information including time and ran light counts in current world.
 
         :Returns:
             Dict: Information dict.
@@ -656,7 +659,7 @@ class CarlaSimulator(BaseSimulator):
     def run_step(self) -> None:
         """
         Run one step simulation.
-        This will tick Carla world and update informations for all sensors and measurement.
+        This will tick Carla world and update information for all sensors and measurement.
         """
         self._world.tick()
         self._tick += 1
@@ -695,8 +698,9 @@ class CarlaSimulator(BaseSimulator):
         This will NOT destroy the Carla client, so simulator can use same carla client to start next episode.
         """
         for actor in self._actor_map['walker_controller']:
-            actor.stop()
-            actor.destroy()
+            if actor.is_alive:
+                actor.stop()
+                actor.destroy()
         self._actor_map['walker_controller'].clear()
         self._actor_map.clear()
 
@@ -719,6 +723,9 @@ class CarlaSimulator(BaseSimulator):
         self._end_timeout = float('inf')
 
         CarlaDataProvider.clean_up()
+        if self._debug:
+            print('after')
+            self._count_actors()
 
     @property
     def town_name(self) -> str:
@@ -753,5 +760,5 @@ class CarlaSimulator(BaseSimulator):
         return self._end_timeout
 
     @property
-    def total_diatance(self) -> float:
+    def total_distance(self) -> float:
         return self._total_distance
