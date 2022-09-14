@@ -1,45 +1,43 @@
 
 
 <!DOCTYPE html>
-<html class="writer-html5" lang="en" >
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8">
   
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>core.models.vae_model &mdash; DI-drive 0.1.2 documentation</title>
-  
-
-  
-  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
-
-  
+  <title>core.models.vae_model &mdash; DI-drive 0.3.4 documentation</title>
   
 
   
   
-
+  
   
 
   
-  <!--[if lt IE 9]>
-    <script src="../../../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
         <script src="../../../_static/jquery.js"></script>
         <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../../_static/doctools.js"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
     
-    <link rel="index" title="Index" href="../../../genindex.html" />
-    <link rel="search" title="Search" href="../../../search.html" />
-    <link href="../../../_static/css/style.css" rel="stylesheet" type="text/css">
 
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -63,7 +61,7 @@
             
             
               <div class="version">
-                0.1.2
+                0.3.4
               </div>
             
           
@@ -80,7 +78,6 @@
           
         </div>
 
-        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -110,7 +107,6 @@
             
           
         </div>
-        
       </div>
     </nav>
 
@@ -145,13 +141,11 @@
 
 
 
-
-
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li><a href="../../../index.html">Docs</a> &raquo;</li>
         
           <li><a href="../../index.html">Module code</a> &raquo;</li>
         
@@ -188,6 +182,7 @@
 <span class="sd">        - in_channels (int): the channel number of input</span>
 <span class="sd">        - latent_dim (int): the latent dimension of the middle representation</span>
 <span class="sd">        - hidden_dims (List): the hidden dimensions of each layer in the MLP architecture in encoder and decoder</span>
+<span class="sd">        - kld_weight(float): the weight of KLD loss</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
@@ -195,6 +190,7 @@
             <span class="n">in_channels</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">latent_dim</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
             <span class="n">hidden_dims</span><span class="p">:</span> <span class="n">List</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">kld_weight</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">VanillaVAE</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">latent_dim</span> <span class="o">=</span> <span class="n">latent_dim</span>
@@ -203,6 +199,7 @@
         <span class="k">if</span> <span class="n">hidden_dims</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">hidden_dims</span> <span class="o">=</span> <span class="p">[</span><span class="mi">32</span><span class="p">,</span> <span class="mi">64</span><span class="p">,</span> <span class="mi">128</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">512</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">hidden_dims</span> <span class="o">=</span> <span class="n">hidden_dims</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kld_weight</span> <span class="o">=</span> <span class="n">kld_weight</span>
 
         <span class="c1"># Build Encoder</span>
         <span class="k">for</span> <span class="n">h_dim</span> <span class="ow">in</span> <span class="n">hidden_dims</span><span class="p">:</span>
@@ -244,7 +241,7 @@
             <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="n">hidden_dims</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">out_channels</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">kernel_size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sigmoid</span><span class="p">()</span>
         <span class="p">)</span>
 
-<div class="viewcode-block" id="VanillaVAE.encode"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.encode">[docs]</a>    <span class="k">def</span> <span class="nf">encode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">]:</span>
+<div class="viewcode-block" id="VanillaVAE.encode"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.encode">[docs]</a>    <span class="k">def</span> <span class="nf">encode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Encodes the input by passing through the encoder network</span>
 <span class="sd">        and returns the latent codes.</span>
@@ -260,10 +257,11 @@
         <span class="c1"># Split the result into mu and var components</span>
         <span class="c1"># of the latent Gaussian distribution</span>
         <span class="n">mu</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc_mu</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+        <span class="n">log_var</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc_var</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">mu</span></div>
+        <span class="k">return</span> <span class="n">mu</span><span class="p">,</span> <span class="n">log_var</span></div>
 
-<div class="viewcode-block" id="VanillaVAE.decode"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.decode">[docs]</a>    <span class="k">def</span> <span class="nf">decode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">:</span>
+<div class="viewcode-block" id="VanillaVAE.decode"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.decode">[docs]</a>    <span class="k">def</span> <span class="nf">decode</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Maps the given latent codes</span>
 <span class="sd">        onto the image space.</span>
@@ -279,7 +277,7 @@
         <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_layer</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">result</span></div>
 
-<div class="viewcode-block" id="VanillaVAE.reparameterize"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.reparameterize">[docs]</a>    <span class="k">def</span> <span class="nf">reparameterize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">,</span> <span class="n">logvar</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">:</span>
+<div class="viewcode-block" id="VanillaVAE.reparameterize"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.reparameterize">[docs]</a>    <span class="k">def</span> <span class="nf">reparameterize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">logvar</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Reparameterization trick to sample from N(mu, var) from</span>
 <span class="sd">        N(0,1).</span>
@@ -294,18 +292,20 @@
         <span class="n">eps</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn_like</span><span class="p">(</span><span class="n">std</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">eps</span> <span class="o">*</span> <span class="n">std</span> <span class="o">+</span> <span class="n">mu</span></div>
 
-<div class="viewcode-block" id="VanillaVAE.forward"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">]:</span>
+<div class="viewcode-block" id="VanillaVAE.forward"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        [summary]</span>
 
 <span class="sd">        :Arguments:</span>
-<span class="sd">            - input (torch.tensor): Input tensor</span>
+<span class="sd">            - input (torch.Tensor): Input tensor</span>
 
 <span class="sd">        :Returns:</span>
-<span class="sd">            List[torch.tensor]: Input and output tensor</span>
+<span class="sd">            List[torch.Tensor]: Input and output tensor</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">mu</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
-        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">mu</span><span class="p">),</span> <span class="nb">input</span><span class="p">]</span></div>
+        <span class="n">mu</span><span class="p">,</span> <span class="n">log_var</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">reparameterize</span><span class="p">(</span><span class="n">mu</span><span class="p">,</span> <span class="n">log_var</span><span class="p">)</span>
+        <span class="c1">#z = mu</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">z</span><span class="p">),</span> <span class="nb">input</span><span class="p">,</span> <span class="n">mu</span><span class="p">,</span> <span class="n">log_var</span><span class="p">]</span></div>
 
 <div class="viewcode-block" id="VanillaVAE.loss_function"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.loss_function">[docs]</a>    <span class="k">def</span> <span class="nf">loss_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -318,14 +318,15 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">recons</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="nb">input</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="n">log_var</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
 
-        <span class="n">kld_weight</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;M_N&#39;</span><span class="p">]</span>  <span class="c1"># Account for the minibatch samples from the dataset</span>
+        <span class="c1">#kld_weight = kwargs[&#39;M_N&#39;]  # Account for the minibatch samples from the dataset</span>
+        <span class="n">kld_weight</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kld_weight</span>
 
         <span class="n">recons_loss</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="n">weight</span> <span class="o">=</span> <span class="p">[</span><span class="mf">8.7924e-01</span><span class="p">,</span> <span class="mf">7.4700e-02</span><span class="p">,</span> <span class="mf">1.0993e-02</span><span class="p">,</span> <span class="mf">6.1075e-04</span><span class="p">,</span> <span class="mf">2.6168e-03</span><span class="p">,</span> <span class="mf">2.8066e-02</span><span class="p">,</span> <span class="mf">3.7737e-03</span><span class="p">]</span>
-
-        <span class="n">ret</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        weight = [8.7924e-01, 7.4700e-02, 1.0993e-02, 6.1075e-04, 2.6168e-03, 2.8066e-02, 3.7737e-03]</span>
 <span class="sd">        vd = 1</span>
 <span class="sd">        for i in range(7):</span>
 <span class="sd">            cur = F.l1_loss(recons[:, i, ...], input[:, i, ...])</span>
@@ -339,19 +340,20 @@
         <span class="k">if</span> <span class="n">recons_loss</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">:</span>
             <span class="n">recons_loss</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">l1_loss</span><span class="p">(</span><span class="n">recons</span><span class="p">,</span> <span class="nb">input</span><span class="p">)</span>
 
-        <span class="n">loss</span> <span class="o">=</span> <span class="n">recons_loss</span>
-        <span class="n">ret</span><span class="p">[</span><span class="s1">&#39;loss&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">loss</span>
+        <span class="n">kld_loss</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">log_var</span> <span class="o">-</span> <span class="n">mu</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">-</span> <span class="n">log_var</span><span class="o">.</span><span class="n">exp</span><span class="p">(),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">ret</span></div>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">recons_loss</span> <span class="o">+</span> <span class="n">kld_weight</span> <span class="o">*</span> <span class="n">kld_loss</span>
 
-<div class="viewcode-block" id="VanillaVAE.sample"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.sample">[docs]</a>    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">current_device</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;loss&#39;</span><span class="p">:</span> <span class="n">loss</span><span class="p">,</span> <span class="s1">&#39;reconstruction_Loss&#39;</span><span class="p">:</span> <span class="n">recons_loss</span><span class="p">,</span> <span class="s1">&#39;KLD&#39;</span><span class="p">:</span> <span class="o">-</span><span class="n">kld_loss</span><span class="p">}</span></div>
+
+<div class="viewcode-block" id="VanillaVAE.sample"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.sample">[docs]</a>    <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">current_device</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
         <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Samples from the latent space and return the corresponding</span>
 <span class="sd">        image space map.</span>
 
 <span class="sd">        :Arguments:</span>
 <span class="sd">            - num_samples(Int): Number of samples.</span>
-<span class="sd">            - param current_device(Int): Device to run the model.</span>
+<span class="sd">            - current_device(Int): Device to run the model.</span>
 <span class="sd">        :Returns:</span>
 <span class="sd">            Tensor: Sampled decode tensor.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -362,7 +364,7 @@
         <span class="n">samples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">samples</span></div>
 
-<div class="viewcode-block" id="VanillaVAE.generate"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.generate">[docs]</a>    <span class="k">def</span> <span class="nf">generate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">:</span>
+<div class="viewcode-block" id="VanillaVAE.generate"><a class="viewcode-back" href="../../../api_doc/models.html#core.models.vae_model.VanillaVAE.generate">[docs]</a>    <span class="k">def</span> <span class="nf">generate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Given an input image x, returns the reconstructed image</span>
 
@@ -379,25 +381,20 @@
            
           </div>
           <footer>
+  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        &#169; Copyright 2021, OpenDILab.
+        &copy; Copyright 2021, OpenDILab
 
     </p>
   </div>
-    
-    
-    
-    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
+
         </div>
       </div>
 
@@ -405,6 +402,7 @@
 
   </div>
   
+
 
   <script type="text/javascript">
       jQuery(function () {
