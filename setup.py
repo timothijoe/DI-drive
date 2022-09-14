@@ -19,17 +19,6 @@ import os
 
 from setuptools import setup, find_packages
 
-<<<<<<< HEAD
-description = """DI-drive: OpenDILab Decision Intelligence Autonomous Driving Platform"""
-
-setup(
-    name='DI-drive',
-    version='0.1.2',
-    description='OpenDILab Decision Intelligence Autonomous Driving Platform',
-    long_description=description,
-    author='OpenDILab',
-    license='MIT License',
-=======
 here = os.path.abspath(os.path.dirname(__file__))
 meta = {}
 with open(os.path.join(here, 'core', '__init__.py'), 'r') as f:
@@ -44,7 +33,6 @@ setup(
     long_description=description,
     author=meta['__AUTHOR__'],
     license='Apache License, Version 2.0',
->>>>>>> upstream/main
     keywords='DL RL AD Platform',
     packages=[
         *find_packages(include=('core', 'core.*')),

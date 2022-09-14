@@ -1,15 +1,6 @@
 # DI-drive
-<<<<<<< HEAD
-
-<img src="./docs/figs/DI-drive.png" width="200" alt="icon"/>
-
-Updated on 2021.09.02 DI-drive-v0.1.2 (beta)
-
-DI-drive - Decision Intelligence Platform for Autonomous Driving simulation.
-=======
 
 <img src="./docs/figs/di-drive_banner.png" alt="icon"/>
->>>>>>> upstream/main
 
 [![Twitter](https://img.shields.io/twitter/url?style=social&url=https%3A%2F%2Ftwitter.com%2Fopendilab)](https://twitter.com/opendilab)
 ![Style](https://github.com/opendilab/DI-drive/actions/workflows/style.yml/badge.svg)
@@ -23,13 +14,9 @@ DI-drive - Decision Intelligence Platform for Autonomous Driving simulation.
 
 ## Introduction
 
-<<<<<<< HEAD
-**DI-drive** is an open-source application platform under **OpenDILab**. DI-drive applies different simulator/datasets/cases in **Decision Intelligence** Training & Testing for **Autonomous Driving** Policy.
-=======
 [DI-drive doc](https://opendilab.github.io/DI-drive/)
 
 **DI-drive** is an open-source Decision Intelligence Platform for Autonomous Driving simulation. DI-drive applies different simulators/datasets/cases in **Decision Intelligence** Training & Testing for **Autonomous Driving** Policy.
->>>>>>> upstream/main
 It aims to
 
 - run Imitation Learning, Reinforcement Learning, GAIL etc. in a single platform and simple unified entry
@@ -79,18 +66,9 @@ Please refer to the [installation guide](https://opendilab.github.io/DI-drive/in
 
 ## Quick Start
 
-<<<<<<< HEAD
-- Pytorch
-- DI-engine
-- Carla Python API
-
-Please refer to the [documentation](https://opendilab.github.io/DI-drive/) for details about installation and user guide of **DI-drive**.
-We provide IL and RL tutorials, and full guidance for quick run existing policy for beginners.
-=======
 ### Carla
 
 Users can check the installation of Carla and watch the visualization by running an 'auto' policy in provided town map. You need to start a Carla server first and modify the Carla host and port in `auto_run.py` into yours. Then run:
->>>>>>> upstream/main
 
 ```bash
 cd demo/auto_run
@@ -235,10 +213,7 @@ DI-engine released under the Apache 2.0 license.
     title={{DI-drive: OpenDILab} Decision Intelligence platform for Autonomous Driving simulation},
     author={DI-drive Contributors},
     publisher = {GitHub},
-    howpublished = {\url{`https://github.com/opendilab/DI-drive`}},
+    howpublished = {\url{https://github.com/opendilab/DI-drive}},
     year={2021},
 }
-<<<<<<< HEAD
-=======
 ```
->>>>>>> upstream/main
