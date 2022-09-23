@@ -6,7 +6,7 @@ __AUTHOR_EMAIL__ = "opendilab.contact@gmail.com"
 __version__ = __VERSION__
 
 SIMULATORS = ['carla', 'metadrive']
-
+SIMULATORS = ['metadrive']
 # if 'carla' in SIMULATORS:
 #     try:
 #         import carla

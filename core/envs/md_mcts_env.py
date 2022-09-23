@@ -45,7 +45,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     },
 
     # ===== Traffic =====
-    traffic_density=0.25,
+    traffic_density=0.3,
     on_screen=False,
     rgb_clip=True,
     need_inverse_traffic=False,
@@ -72,14 +72,14 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # ===== Agent =====
     target_vehicle_configs={
-        DEFAULT_AGENT: dict(use_special_color=True, spawn_lane_index=(FirstPGBlock.NODE_1, FirstPGBlock.NODE_2, 3))
+        DEFAULT_AGENT: dict(use_special_color=True, spawn_lane_index=(FirstPGBlock.NODE_1, FirstPGBlock.NODE_2, 2))
     },
 
     # ===== Reward Scheme =====
     # See: https://github.com/decisionforce/metadrive/issues/283
     success_reward=10.0,
     out_of_road_penalty=5.0,
-    crash_vehicle_penalty=5.0,
+    crash_vehicle_penalty=1.0,
     crash_object_penalty=5.0,
     driving_reward=1.0,
     speed_reward=0.1,
@@ -97,7 +97,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
 
 @ENV_REGISTRY.register("md_macro")
-class MetaDriveMacroEnv(BaseEnv):
+class MetaDriveMCTSEnv(BaseEnv):
     """
     MetaDrive single-agent env controlled by a "macro" action. The agent is controlled by
     a discrete action set. Each one related to a series of control signals that can complish
@@ -170,7 +170,7 @@ class MetaDriveMacroEnv(BaseEnv):
         return config
 
     def _post_process_config(self, config):
-        config = super(MetaDriveMacroEnv, self)._post_process_config(config)
+        config = super(MetaDriveMCTSEnv, self)._post_process_config(config)
         if not config["rgb_clip"]:
             logging.warning(
                 "You have set rgb_clip = False, which means the observation will be uint8 values in [0, 255]. "
@@ -299,8 +299,7 @@ class MetaDriveMacroEnv(BaseEnv):
         reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
         reward += self.config["speed_reward"] * (vehicle.speed / vehicle.max_speed) * positive_road
         #print('vel speed: {}'.format(vehicle.speed))
-        speed_rwd = -0.1 if vehicle.speed < 50 else 0
-        #speed_rwd = -0.3 if vehicle.speed < 60 else 0
+        speed_rwd = -0.3 if vehicle.speed < 60 else 0
         reward += speed_rwd
 
         step_info["step_reward"] = reward
@@ -344,7 +343,7 @@ class MetaDriveMacroEnv(BaseEnv):
         self.main_camera.stop_track()
 
     def setup_engine(self):
-        super(MetaDriveMacroEnv, self).setup_engine()
+        super(MetaDriveMCTSEnv, self).setup_engine()
         self.engine.accept("b", self.switch_to_top_down_view)
         self.engine.accept("q", self.switch_to_third_person_view)
         from core.utils.simulator_utils.md_utils.traffic_manager_utils import MacroTrafficManager
@@ -434,7 +433,7 @@ class MetaDriveMacroEnv(BaseEnv):
                 p = self.engine.get_policy(v.name)
                 target_speed = p.NORMAL_SPEED * 0.1
                 v.set_velocity(v.heading, target_speed)
-        for i in range(3):
+        for i in range(1):
             o, r, d, info = self.step(self.action_type.actions_indexes["IDLE"])
             o = o
         return o

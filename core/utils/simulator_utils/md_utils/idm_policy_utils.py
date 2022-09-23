@@ -6,7 +6,7 @@ class MacroIDMPolicy(IDMPolicy):
 
     def __init__(self, control_object, random_seed, normal_speed=18, safe_lane_change_dist=15):
         super(MacroIDMPolicy, self).__init__(control_object=control_object, random_seed=random_seed)
-        self.NORMAL_SPEED_CONST = 20
+        self.NORMAL_SPEED_CONST = 50 #20
         self.NORMAL_SPEED_CONST = normal_speed
         self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
         self.LANE_CHANGE_FREQ = 300
@@ -56,6 +56,6 @@ class MacroIDMPolicy(IDMPolicy):
         if current_lane_idx == 0 or current_lane_idx == current_lane_idx - 1:
             self.NORMAL_SPEED = self.NORMAL_SPEED_CONST
         elif current_lane_idx % 2 == 0:
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 3
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST + 10
         else:
-            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST - 3
+            self.NORMAL_SPEED = self.NORMAL_SPEED_CONST - 10

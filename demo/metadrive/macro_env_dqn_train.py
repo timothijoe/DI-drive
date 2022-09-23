@@ -22,7 +22,7 @@ metadrive_macro_config = dict(
         ),
         n_evaluator_episode=2,
         stop_value=99999,
-        collector_env_num=14,
+        collector_env_num=4,
         evaluator_env_num=2,
         wrapper=dict(),
     ),

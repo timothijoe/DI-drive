@@ -39,6 +39,7 @@ class DriveEnvWrapper(gym.Wrapper):
         self.env = env
         if not hasattr(self.env, 'reward_space'):
             self.reward_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(1, ))
+        self.action_space = self.env.action_space 
 
     def reset(self, *args, **kwargs) -> Any:
         """
@@ -51,12 +52,18 @@ class DriveEnvWrapper(gym.Wrapper):
         obs = self.env.reset(*args, **kwargs)
         obs = to_ndarray(obs, dtype=np.float32)
         if isinstance(obs, np.ndarray) and len(obs.shape) == 3:
-            obs = obs.transpose((2, 0, 1))
+            obs = obs  #.transpose((2, 0, 1))
         elif isinstance(obs, dict):
             birdview = obs['birdview'].transpose((2, 0, 1))
             obs = {'birdview': birdview, 'vehicle_state': obs['vehicle_state']}
         self._final_eval_reward = 0.0
-        return obs
+        metadrive_obs = {}
+        metadrive_obs['observation'] = obs 
+        metadrive_obs['action_mask'] = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+        metadrive_obs['to_play'] = None 
+        #print('zt initialization')
+        #return obs
+        return metadrive_obs 
 
     def step(self, action: Any = None) -> BaseEnvTimestep:
         """
@@ -77,14 +84,21 @@ class DriveEnvWrapper(gym.Wrapper):
         self._final_eval_reward += rew
         obs = to_ndarray(obs, dtype=np.float32)
         if isinstance(obs, np.ndarray) and len(obs.shape) == 3:
-            obs = obs.transpose((2, 0, 1))
+            obs = obs #.transpose((2, 0, 1))
         elif isinstance(obs, dict):
             birdview = obs['birdview'].transpose((2, 0, 1))
             obs = {'birdview': birdview, 'vehicle_state': obs['vehicle_state']}
         rew = to_ndarray([rew], dtype=np.float32)
+        #print('zt step: {}'.format(action))
+        metadrive_obs = {}
+        metadrive_obs['observation'] = obs 
+        metadrive_obs['action_mask'] = np.array([1.0, 1.0, 1.0, 1.0, 1.0])
+        metadrive_obs['to_play'] = None 
         if done:
             info['final_eval_reward'] = self._final_eval_reward
-        return BaseEnvTimestep(obs, rew, done, info)
+        #return BaseEnvTimestep(obs, rew, done, info)
+        return BaseEnvTimestep(metadrive_obs, rew, done, info)
+    
 
     def seed(self, seed: int, dynamic_seed: bool = True) -> None:
         self._seed = seed
