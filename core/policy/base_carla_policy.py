@@ -1,7 +1,7 @@
 from collections import namedtuple, deque
 from typing import List, Dict, Optional, Union, Any, NamedTuple
 
-from ding.utils.default_helper import deep_merge_dicts
+from core.utils.others.config_helper import deep_merge_dicts
 from ding.policy import Policy
 
 
@@ -71,15 +71,6 @@ class BaseCarlaPolicy(Policy):
         if isinstance(data, deque):
             data = list(data)
         return data
-
-    def _state_dict_learn(self) -> Dict[str, Any]:
-        return {'model': self._model.state_dict()}
-
-    def _state_dict_collect(self) -> Dict[str, Any]:
-        return {'model': self._model.state_dict()}
-
-    def _state_dict_eval(self) -> Dict[str, Any]:
-        return {'model': self._model.state_dict()}
 
     def _load_state_dict_learn(self, state_dict: Dict[str, Any]) -> None:
         self._model.load_state_dict(state_dict['model'], strict=True)

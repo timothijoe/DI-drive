@@ -21,13 +21,11 @@ Reinforcement Learning Model Zoo
    simple_rl
    implicit
    latent_rl
-   md_macro
 
 
 Other Method
 ===============
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
-   drex

@@ -1,5 +1,5 @@
-Carla Benchmark Evaluation
-###########################
+Benchmark Evaluation
+#####################
 
 .. toctree::
     :maxdepth: 2

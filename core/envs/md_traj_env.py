@@ -6,24 +6,31 @@ import numpy as np
 from gym import spaces
 from collections import defaultdict
 from typing import Union, Dict, AnyStr, Tuple, Optional
+from gym.envs.registration import register
 import logging
 
-from ding.utils import ENV_REGISTRY
 from core.utils.simulator_utils.md_utils.discrete_policy import DiscreteMetaAction
-from core.utils.simulator_utils.md_utils.agent_manager_utils import TrajAgentManager
-from core.utils.simulator_utils.md_utils.engine_utils import TrajEngine, initialize_engine, close_engine, \
-     engine_initialized, set_global_random_seed
+from core.utils.simulator_utils.md_utils.agent_manager_utils import MacroAgentManager
+from core.utils.simulator_utils.md_utils.engine_utils import initialize_engine, close_engine, \
+    engine_initialized, set_global_random_seed, MacroBaseEngine
 from core.utils.simulator_utils.md_utils.traffic_manager_utils import TrafficMode
-from metadrive.constants import RENDER_MODE_NONE, DEFAULT_AGENT, REPLAY_DONE, TerminationState
+from core.utils.simulator_utils.md_utils.observation_utils import HRLTopDownMultiChannel
+from metadrive.constants import RENDER_MODE_NONE, DEFAULT_AGENT, REPLAY_DONE
 from metadrive.envs.base_env import BaseEnv
 from metadrive.component.map.base_map import BaseMap
 from metadrive.component.map.pg_map import parse_map_config, MapGenerateMethod
 # from metadrive.manager.traffic_manager import TrafficMode
 from metadrive.component.pgblock.first_block import FirstPGBlock
-from metadrive.utils import Config, merge_dicts, get_np_random, clip, concat_step_infos
+from metadrive.constants import DEFAULT_AGENT, TerminationState
+from metadrive.component.vehicle.base_vehicle import BaseVehicle
+from metadrive.utils import Config, merge_dicts, get_np_random, clip
+from metadrive.utils import Config, merge_dicts, get_np_random, concat_step_infos
 from metadrive.envs.base_env import BASE_DEFAULT_CONFIG
 from metadrive.obs.top_down_obs_multi_channel import TopDownMultiChannel
-from metadrive.engine.base_engine import BaseEngine
+from metadrive.utils.utils import auto_termination
+from core.policy.ad_policy.traj_vae import VaeDecoder
+import torch
+from metadrive.component.road_network import Road
 
 DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Generalization =====
@@ -33,6 +40,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # ===== Map Config =====
     map='SSSSSSSSSS',  # int or string: an easy way to fill map_config
+    # map='SSSSSSS',
     random_lane_width=True,
     random_lane_num=True,
     map_config={
@@ -44,7 +52,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     },
 
     # ===== Traffic =====
-    traffic_density=0.3,
+    traffic_density=0.0,
     on_screen=False,
     rgb_clip=True,
     need_inverse_traffic=False,
@@ -76,27 +84,15 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 
     # ===== Reward Scheme =====
     # See: https://github.com/decisionforce/metadrive/issues/283
-    success_reward=10.0,  # 10.0,
-    out_of_road_penalty=5.0,  # 5.0,
-    crash_vehicle_penalty=5.0,  # 1.0,
-    crash_object_penalty=5.0,  # 5.0,
-    run_out_of_time_penalty=5.0,  # 5.0,
+    success_reward= 10.0, #10.0,
+    out_of_road_penalty= 1.0, #1.0,
+    crash_vehicle_penalty=1.0, #1.0,
+    crash_object_penalty=5.0, #5.0,
+    run_out_of_time_penalty = 5.0, #5.0,
+    driving_reward=0.1,
+    speed_reward=0.2,
+    heading_reward = 0.3, 
 
-    # Transition reward
-    driving_reward=0.1,  # 0.1
-    speed_reward=0.2,  # 0.2
-    heading_reward=0.3,
-    jerk_bias=15.0,
-    jerk_dominator=45.0,  # 50.0
-    jerk_importance=0.6,  # 0.6
-
-    # ===== Reward Switch =====
-    # whether to use a reward option or not
-    use_speed_reward=True,
-    use_heading_reward=False,
-    use_jerk_reward=False,
-    use_lateral=True,
-    lateral_scale=0.25,
 
     # ===== Cost Scheme =====
     crash_vehicle_cost=1.0,
@@ -106,47 +102,46 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     # ===== Termination Scheme =====
     out_of_route_done=True,
     physics_world_step_size=1e-1,
-    const_episode_max_step=False,
-    episode_max_step=150,
-    avg_speed=6.5,
 
     # ===== Trajectory length =====
-    seq_traj_len=10,
-    show_seq_traj=False,
+    seq_traj_len = 10,
+    show_seq_traj = False,
+    debug_info=False,
+    enable_u_turn = False,
+    #episode_max_step = 100,
 
-    # ===== traj_control_mode = 'acc', # another type is 'jerk'  =====
-    # if we choose traj_control_mode = 'acc', then the current state is [0,0,0,v] and the control signal
-    # is throttle and steer
-    # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control
-    # signal is jerk and steer rate (delta_steer)
-    traj_control_mode='acc',
+    
 
-    # ===== Expert data saving =====
-    save_expert_data=False,
-    expert_data_folder=None,
+
+    #traj_control_mode = 'acc', # another type is 'jerk'
+    traj_control_mode = 'jerk',
+    # if we choose traj_control_mode = 'acc', then the current state is [0,0,0,v] and the control signal is throttle and steer
+    # If not, we will use jerk control, the current state we have vel, acc, current steer, and the control signal is jerk and steer rate (delta_steer)
+    
+    # Reward Option Scheme
+    const_episode_max_step = False,
+    episode_max_step = 150,
+    avg_speed = 6.5,
+
+    use_lateral=True,
+    lateral_scale = 0.25, 
+
+    jerk_bias = 15.0, 
+    jerk_dominator = 45.0, #50.0
+    jerk_importance = 0.6, # 0.6
+    use_speed_reward = True,
+    use_heading_reward = False,
+    use_jerk_reward = False,
+    ignore_first_steer = False,
+    add_extra_speed_penalty = False,
 )
 
 
-@ENV_REGISTRY.register("md_traj")
 class MetaDriveTrajEnv(BaseEnv):
-    """
-    MetaDrive single-agent trajectory env. The agent is controlled by a trajectory
-    (a list of waypoints) of a time period. Its length determines the times of env steps
-    the agent will track it. The vehicle will execute actions along the trajectory by 'move_to'
-    method of the simulator rather than physical controlling. The position is calculated
-    from the trajectory with kinematic constraints before the vehicle is transmitted.
-    The observation is a 5-channel top-down view image and a vector of structure
-    information by default. This env is registered and can be used via `gym.make`.
-
-    :Arguments:
-        - config (Dict): Env config dict.
-
-    :Interfaces: reset, step, close, render, seed
-    """
 
     @classmethod
     def default_config(cls) -> "Config":
-        #config = super(MetaDriveTrajEnv, cls).default_config()
+        #config = super(SimpleMetaDriveEnv, cls).default_config()
         config = Config(BASE_DEFAULT_CONFIG)
         config.update(DIDRIVE_DEFAULT_CONFIG)
         config.register_type("map", str, int)
@@ -171,14 +166,14 @@ class MetaDriveTrajEnv(BaseEnv):
         assert isinstance(self.num_agents, int) and (self.num_agents > 0 or self.num_agents == -1)
 
         # observation and action space
-        self.agent_manager = TrajAgentManager(
+        self.agent_manager = MacroAgentManager(
             init_observations=self._get_observations(), init_action_space=self._get_action_space()
         )
         self.action_type = DiscreteMetaAction()
         #self.action_space = self.action_type.space()
 
         # lazy initialization, create the main vehicle in the lazy_init() func
-        self.engine: Optional[BaseEngine] = None
+        self.engine: Optional[MacroBaseEngine] = None
         self._top_down_renderer = None
         self.episode_steps = 0
         # self.current_seed = None
@@ -194,14 +189,26 @@ class MetaDriveTrajEnv(BaseEnv):
         self.time = 0
         self.step_num = 0
         self.episode_rwd = 0
+        # self.vae_decoder = VaeDecoder(
+        #         embedding_dim = 64,
+        #         h_dim = 64,
+        #         latent_dim = 2,
+        #         seq_len = self.config['seq_traj_len'],
+        #         dt = 0.1
+        #     )
+        # # vae_load_dir = 'ckpt_files/a79_decoder_ckpt'
+        # # vae_load_dir = '/home/SENSETIME/zhoutong/hoffnung/xad/ckpt_files/seq_len_20_79_decoder_ckpt'
+        # if self.config['seq_traj_len'] == 10:
+        #     vae_load_dir = 'ckpt_files/seq_len_10_decoder_ckpt'
+        # elif self.config['seq_traj_len'] == 15:
+        #     vae_load_dir = 'ckpt_files/seq_len_15_78_decoder_ckpt'
+        # else:
+        #     assert self.config['seq_traj_len'] == 20
+        #     vae_load_dir = 'ckpt_files/seq_len_20_79_decoder_ckpt'
+        # self.vae_decoder.load_state_dict(torch.load(vae_load_dir))
         self.vel_speed = 0.0
         self.z_state = np.zeros(6)
         self.avg_speed = self.config["avg_speed"]
-
-        self.episode_max_step = self.config["episode_max_step"]
-        if self.config["save_expert_data"]:
-            assert self.config["expert_data_folder"] is not None
-            self.single_transition_list = []
 
     # define a action type, and execution style
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
@@ -209,103 +216,45 @@ class MetaDriveTrajEnv(BaseEnv):
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
         self.episode_steps += 1
+        # if not isinstance(actions,list):
+        #     action_seq = []
+        #     for i in range(31):
+        #         action_seq.append([actions[2 * i], actions[2 *i+1]])
+        #     actions = action_seq
+        #action_seq =  np.array(action_seq)
+        # init_state = np.zeros([1, 4])
+        # init_state[0,3] = self.vel_speed
+        # init_state = torch.from_numpy(init_state)
+        #actions = np.array([1,1])
+        # if isinstance(actions, np.ndarray):
+        #     batch_action = torch.from_numpy(actions)
+        #     batch_action = torch.unsqueeze(batch_action, 0)
+        #     batch_action = batch_action.to(torch.float32)
+        #     init_state = init_state.to(torch.float32)
+        #     with torch.no_grad():
+        #         trajs = self.vae_decoder(batch_action, init_state)
+        #     trajs = torch.cat([init_state.unsqueeze(1), trajs], dim = 1)
+        #     trajs = trajs[:,:,:2]
+        #     trajs = torch.squeeze(trajs, 0)
+        #     actions = trajs.numpy()
         macro_actions = self._preprocess_macro_waypoints(actions)
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
         self.step_num = self.step_num + 1
-        self.episode_rwd = self.episode_rwd + r
+        self.episode_rwd = self.episode_rwd + r 
         #print('step number is: {}'.format(self.step_num))
         #o = o.transpose((2,0,1))
         return o, r, d, i
 
-    def _update_pen_state(self, vehicle):
-        vehicle.pen_state['position'] = copy.deepcopy(vehicle.prev_state['position'])
-        vehicle.pen_state['yaw'] = copy.deepcopy(vehicle.prev_state['yaw'])
-        vehicle.pen_state['speed'] = copy.deepcopy(vehicle.prev_state['speed'])
-
-    def compute_jerk(self, vehicle):
-        v_t0 = vehicle.pen_state['speed']
-        theta_t0 = vehicle.pen_state['yaw']
-        v_t1 = vehicle.prev_state['speed']
-        theta_t1 = vehicle.prev_state['yaw']
-        v_t2 = vehicle.curr_state['speed']
-        theta_t2 = vehicle.curr_state['yaw']
-        t_inverse = 1.0 / self.config['physics_world_step_size']
-        jerk_x = (
-            v_t2 * np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + v_t0 * np.cos(theta_t0)
-        ) * t_inverse * t_inverse
-        jerk_y = (
-            v_t2 * np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + v_t0 * np.sin(theta_t0)
-        ) * t_inverse * t_inverse
-        jerk_array = np.array([jerk_x, jerk_y])
-        jerk = np.linalg.norm(jerk_array)
-        return jerk
-
-    def calc_onestep_reward(self, vehicle):
-        # vehicle.curr_state['position'] = vehicle.position
-        # vehicle.curr_state['yaw'] = vehicle.heading_theta
-        # vehicle.curr_state['speed'] = vehicle.speed / 3.6
-
-        if vehicle.lane in vehicle.navigation.current_ref_lanes:
-            current_lane = vehicle.lane
-            positive_road = 1
-        else:
-            current_lane = vehicle.navigation.current_ref_lanes[0]
-            current_road = vehicle.navigation.current_road
-            positive_road = 1 if not current_road.is_negative_road() else -1
-        long_last, _ = current_lane.local_coordinates(vehicle.prev_state['position'])
-        long_now, lateral_now = current_lane.local_coordinates(vehicle.position)
-
-        # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
-        if self.config["use_lateral"]:
-            lateral_factor = clip(1 - 0.5 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
-        else:
-            lateral_factor = 1.0
-
-        reward = 0.0
-        #lateral_factor
-        reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
-        max_spd = 10
-        reward += self.config["speed_reward"] * (vehicle.curr_state['speed'] / max_spd) * positive_road
-        speed_rwd = -0.06 if vehicle.curr_state['speed'] < self.avg_speed else 0
-        reward += speed_rwd
-
-        v_t0 = vehicle.pen_state['speed']
-        theta_t0 = vehicle.pen_state['yaw']
-        v_t1 = vehicle.prev_state['speed']
-        theta_t1 = vehicle.prev_state['yaw']
-        v_t2 = vehicle.curr_state['speed']
-        theta_t2 = vehicle.curr_state['yaw']
-        t_inverse = 1.0 / self.config['physics_world_step_size']
-        jerk_x = (
-            v_t2 * np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + v_t0 * np.cos(theta_t0)
-        ) * t_inverse * t_inverse
-        jerk_y = (
-            v_t2 * np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + v_t0 * np.sin(theta_t0)
-        ) * t_inverse * t_inverse
-        jerk_array = np.array([jerk_x, jerk_y])
-        jerk = np.linalg.norm(jerk_array)
-        #jerk_penalty = np.tanh( (jerk)/ 50)
-        jerk_penalty = max(np.tanh((jerk - self.config["jerk_bias"]) / self.config["jerk_dominator"]), 0)
-        jerk_penalty = self.config["jerk_importance"] * jerk_penalty
-        reward -= jerk_penalty
-
-        if vehicle.arrive_destination:
-            reward = +self.config["success_reward"]
-        elif vehicle.macro_succ:
-            reward = +self.config["success_reward"]
-        elif self._is_out_of_road(vehicle):
-            reward = -self.config["out_of_road_penalty"]
-        elif vehicle.crash_vehicle:
-            reward = -self.config["crash_vehicle_penalty"]
-        elif vehicle.macro_crash:
-            reward = -self.config["crash_vehicle_penalty"]
-        elif vehicle.crash_object:
-            reward = -self.config["crash_object_penalty"]
-        elif self.step_num >= self.episode_max_step:
-            reward = -self.config["run_out_of_time_penalty"]
-        #print('reward: {}'.format(reward))
-        return reward
+    def get_waypoint_list(self):
+        x = np.arange(0, 6.2, 0.2)
+        LENGTH = 0 # 4.51
+        y = 1 * np.cos(np.pi*2 / 6.0 * x)-1
+        x = x + LENGTH/2
+        lst = []
+        for i in range(x.shape[0]):
+            lst.append([x[i],y[i]])
+        return lst
 
     def _merge_extra_config(self, config: Union[dict, "Config"]) -> "Config":
         config = self.default_config().update(config, allow_add_new_key=True)
@@ -393,7 +342,7 @@ class MetaDriveTrajEnv(BaseEnv):
             done_info[TerminationState.CRASH_VEHICLE] or done_info[TerminationState.CRASH_OBJECT]
             or done_info[TerminationState.CRASH_BUILDING]
         )
-        done_info['complete_ratio'] = clip(self.already_go_dist / self.navi_distance + 0.05, 0.0, 1.0)
+        done_info['complete_ratio'] = clip(self.already_go_dist/ self.navi_distance + 0.05, 0.0, 1.0)
         done_info['seq_traj_len'] = self.config['seq_traj_len']
 
         return done, done_info
@@ -451,9 +400,7 @@ class MetaDriveTrajEnv(BaseEnv):
         # use_lateral_penalty = False
         # # reward for lane keeping, without it vehicle can learn to overtake but fail to keep in lane
         if self.config["use_lateral"]:
-            lateral_factor = clip(
-                1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0
-            )
+            lateral_factor = clip(1 - 0.5 * abs(avg_lateral_cum) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
             #lateral_factor = clip(1 - 2 * abs(lateral_now) / vehicle.navigation.get_current_lane_width(), 0.0, 1.0)
         else:
             lateral_factor = 1.0
@@ -462,36 +409,45 @@ class MetaDriveTrajEnv(BaseEnv):
         driving_reward = 0.0
         speed_reward = 0.0
         heading_reward = 0.0
-        jerk_reward = 0.0
+        jerk_reward = 0.0 
         # Generally speaking, driving reward is a necessity
-        driving_reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road
+        driving_reward += self.config["driving_reward"] * (long_now - long_last) * lateral_factor * positive_road 
         # # Speed reward
         if self.config["use_speed_reward"]:
             max_spd = 10
             speed_list = self.compute_speed_list(vehicle)
-            for speed in speed_list:
-                speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road
-                if speed < self.avg_speed:
-                    #speed_reward -= 0.00 #0.06
-                    speed_reward = speed_reward
+            for speed in speed_list: 
+                speed_reward += self.config["speed_reward"] * (speed / max_spd) * positive_road  
+                if self.config['add_extra_speed_penalty']:
+                    if speed < self.avg_speed:
+                        speed_reward -= 0.12 
+                else: 
+                    if speed < self.avg_speed - 2:
+                        speed_reward -= 0.04 #0.06, 0.12
         if self.config["use_heading_reward"]:
             # Heading Reward
             heading_error_list = self.compute_heading_error_list(vehicle, current_lane)
             for heading_error in heading_error_list:
-                heading_reward += self.config["heading_reward"] * (0 - np.abs(heading_error))
+                heading_reward += self.config["heading_reward"] * (0 - np.abs(heading_error))             
         if self.config["use_jerk_reward"]:
             jerk_list = self.compute_jerk_list(vehicle)
             for jerk in jerk_list:
                 #jerk_reward += (0.03 - 0.6 * np.tanh(jerk / 100.0))
                 #jerk_reward += (0.03 - self.config["jerk_importance"] * np.tanh(jerk / self.config["jerk_dominator"]))
-                jerk_penalty = max(np.tanh((jerk - self.config["jerk_bias"]) / self.config["jerk_dominator"]), 0)
+                jerk_penalty = max(np.tanh((jerk-self.config["jerk_bias"])/self.config["jerk_dominator"]),0)
                 jerk_penalty = self.config["jerk_importance"] * jerk_penalty
                 jerk_reward -= jerk_penalty
-        reward = driving_reward + speed_reward + heading_reward + jerk_reward
-        # print('driving reward: {}'.format(driving_reward))
-        # print('speed reward: {}'.format(speed_reward))
-        # print('heading reward: {}'.format(heading_reward))
-        # print('jerk reward: {}'.format(jerk_reward))
+        reward = driving_reward + speed_reward + heading_reward + jerk_reward 
+        if self.config['debug_info']:
+            print('#####################################################################################')
+            print('driving reward: {}'.format(driving_reward))
+            print('speed reward: {}'.format(speed_reward))
+            print('heading reward: {}'.format(heading_reward))
+            print('jerk reward: {}'.format(jerk_reward))
+            print('max step: {}'.format(self.episode_max_step))
+            print('current step: {}'.format(self.step_num))
+            print('total reward: {}'.format(reward))
+        # print('speed: {}'.format(speed))
         step_info["step_reward"] = reward
         if vehicle.arrive_destination:
             reward = +self.config["success_reward"]
@@ -506,24 +462,28 @@ class MetaDriveTrajEnv(BaseEnv):
         elif vehicle.crash_object:
             reward = -self.config["crash_object_penalty"]
         elif self.step_num >= self.episode_max_step:
-            reward = -self.config["run_out_of_time_penalty"]
+            reward = - self.config["run_out_of_time_penalty"]
         return reward, step_info
-
+    
     def get_navigation_len(self, vehicle):
         checkpoints = vehicle.navigation.checkpoints
         road_network = vehicle.navigation.map.road_network
         total_dist = 0
-        assert len(checkpoints) >= 2
-        for check_num in range(0, len(checkpoints) - 1):
+        assert len(checkpoints) >=2
+        for check_num in range(0, len(checkpoints)-1):
             front_node = checkpoints[check_num]
-            end_node = checkpoints[check_num + 1]
+            end_node = checkpoints[check_num+1] 
             cur_lanes = road_network.graph[front_node][end_node]
             target_lane_num = int(len(cur_lanes) / 2)
             target_lane = cur_lanes[target_lane_num]
             target_lane_length = target_lane.length
-            total_dist += target_lane_length
-        return total_dist
+            total_dist += target_lane_length 
 
+        if hasattr(vehicle.navigation, 'u_turn_case'):
+            if vehicle.navigation.u_turn_case is True:
+                total_dist += 35
+        return total_dist
+            
     def compute_jerk_list(self, vehicle):
         jerk_list = []
         #vehicle = self.vehicles[vehicle_id]
@@ -534,27 +494,19 @@ class MetaDriveTrajEnv(BaseEnv):
         v_t2 = vehicle.traj_wp_list[1]['speed']
         theta_t2 = vehicle.traj_wp_list[1]['yaw']
         t_inverse = 1.0 / self.config['physics_world_step_size']
-        first_point_jerk_x = (
-            v_t2 * np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + v_t0 * np.cos(theta_t0)
-        ) * t_inverse * t_inverse
-        first_point_jerk_y = (
-            v_t2 * np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + v_t0 * np.sin(theta_t0)
-        ) * t_inverse * t_inverse
+        first_point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) +  v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+        first_point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) +  v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
         jerk_list.append(np.array([first_point_jerk_x, first_point_jerk_y]))
         # plus one because we store the current value as first, which means the whole trajectory is seq_traj_len + 1
         for i in range(2, self.config['seq_traj_len'] + 1):
-            v_t0 = vehicle.traj_wp_list[i - 2]['speed']
-            theta_t0 = vehicle.traj_wp_list[i - 2]['yaw']
-            v_t1 = vehicle.traj_wp_list[i - 1]['speed']
-            theta_t1 = vehicle.traj_wp_list[i - 1]['yaw']
+            v_t0 = vehicle.traj_wp_list[i-2]['speed']
+            theta_t0 = vehicle.traj_wp_list[i-2]['yaw']
+            v_t1 = vehicle.traj_wp_list[i-1]['speed']
+            theta_t1 = vehicle.traj_wp_list[i-1]['yaw']
             v_t2 = vehicle.traj_wp_list[i]['speed']
-            theta_t2 = vehicle.traj_wp_list[i]['yaw']
-            point_jerk_x = (
-                v_t2 * np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + v_t0 * np.cos(theta_t0)
-            ) * t_inverse * t_inverse
-            point_jerk_y = (
-                v_t2 * np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + v_t0 * np.sin(theta_t0)
-            ) * t_inverse * t_inverse
+            theta_t2 = vehicle.traj_wp_list[i]['yaw']    
+            point_jerk_x = (v_t2* np.cos(theta_t2) - 2 * v_t1 * np.cos(theta_t1) + v_t0 * np.cos(theta_t0)) * t_inverse * t_inverse
+            point_jerk_y = (v_t2* np.sin(theta_t2) - 2 * v_t1 * np.sin(theta_t1) + v_t0 * np.sin(theta_t0)) * t_inverse * t_inverse
             jerk_list.append(np.array([point_jerk_x, point_jerk_y]))
         #final_jerk_value = 0
         step_jerk_list = []
@@ -562,6 +514,21 @@ class MetaDriveTrajEnv(BaseEnv):
             #final_jerk_value += np.linalg.norm(jerk)
             step_jerk_list.append(np.linalg.norm(jerk))
         return step_jerk_list
+
+
+    # def update_current_state(self, vehicle):
+    #     vehicle = self.vehicles[vehicle_id]
+    #     t_inverse = 1.0 / self.config['physics_world_step_size']
+    #     theta_t1 = vehicle.traj_wp_list[-2]['yaw']
+    #     theta_t2 = vehicle.traj_wp_list[-1]['yaw']
+    #     v_t1 = vehicle.traj_wp_list[-2]['speed']
+    #     v_t2 = vehicle.traj_wp_list[-1]['speed']
+    #     v_state = np.zeros(6)
+    #     v_state[3] = v_t2
+    #     v_state[4] = (v_t2 - v_t1) * t_inverse 
+    #     theta_dot = (theta_t2 - theta_t1) * t_inverse
+    #     v_state[5] = np.arctan(2.5 * theta_dot / v_t2) if v_t2 > 0.001 else 0.0
+    #     self.z_state = v_state
 
     def update_current_state(self, vehicle_id):
         vehicle = self.vehicles[vehicle_id]
@@ -572,15 +539,17 @@ class MetaDriveTrajEnv(BaseEnv):
         v_t2 = vehicle.traj_wp_list[-1]['speed']
         v_state = np.zeros(6)
         v_state[3] = v_t2
-        v_state[4] = (v_t2 - v_t1) * t_inverse
+        v_state[4] = (v_t2 - v_t1) * t_inverse 
         theta_dot = (theta_t2 - theta_t1) * t_inverse
         v_state[5] = np.arctan(2.5 * theta_dot / v_t2) if v_t2 > 0.001 else 0.0
         self.z_state = v_state
+        if hasattr(vehicle, 'vis_state'):
+            vehicle.vis_state = copy.deepcopy(self.z_state)
 
     def compute_heading_error_list(self, vehicle, lane):
         heading_error_list = []
         for i in range(1, self.config['seq_traj_len'] + 1):
-            theta = vehicle.traj_wp_list[i]['yaw']
+            theta = vehicle.traj_wp_list[i]['yaw'] 
             long_now, lateral_now = lane.local_coordinates(vehicle.traj_wp_list[i]['position'])
             road_heading_theta = lane.heading_theta_at(long_now)
             theta_error = self.wrap_angle(theta - road_heading_theta)
@@ -642,7 +611,7 @@ class MetaDriveTrajEnv(BaseEnv):
             self.vel_speed = v.last_spd
             if self.config["traj_control_mode"] == 'jerk':
                 o_dict = {}
-                o_dict['birdview'] = o
+                o_dict['birdview'] = o 
                 # v_state = np.zeros(4)
                 # v_state[3] = v.last_spd
                 v_state = self.z_state
@@ -650,10 +619,13 @@ class MetaDriveTrajEnv(BaseEnv):
                 #o_dict['speed'] = v.last_spd
             elif self.config["traj_control_mode"] == 'acc':
                 o_dict = {}
-                o_dict['birdview'] = o
+                o_dict['birdview'] = o 
                 # v_state = np.zeros(4)
                 # v_state[3] = v.last_spd
-                v_state = self.z_state[:4]
+                v_state = self.z_state[:6] #:4
+                if self.config['ignore_first_steer']:
+                    v_state[5] = 0.0
+                # v_state[3] = 5.0
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             else:
@@ -668,14 +640,14 @@ class MetaDriveTrajEnv(BaseEnv):
 
         should_done = engine_info.get(REPLAY_DONE, False
                                       ) or (self.config["horizon"] and self.episode_steps >= self.config["horizon"])
-        #termination_infos = self.for_each_vehicle(self.auto_termination, should_done)
+        termination_infos = self.for_each_vehicle(auto_termination, should_done)
 
         step_infos = concat_step_infos([
             engine_info,
             done_infos,
             reward_infos,
             cost_infos,
-            #termination_infos,
+            termination_infos,
         ])
 
         if should_done:
@@ -746,24 +718,19 @@ class MetaDriveTrajEnv(BaseEnv):
         policy_frequency = 1
         frames = int(simulation_frequency / policy_frequency)
         self.time = 0
+        # print('seq len is: ')
+        # print(self.config['seq_traj_len'])
+        #print('di action pairs: {}'.format(actions))
+        #actions = {vid: self.action_type.actions[vvalue] for vid, vvalue in actions.items()}
+        # wp_list = self.get_waypoint_list()
+        # wps = dict()
+        # for vid in actions.keys():
+        #     wps[vid] = wp_list
         wps = actions
         for frame in range(frames):
             # we use frame to update robot position, and use wps to represent the whole trajectory
-            assert len(self.vehicles.items()) == 1
-            onestep_o = np.zeros((200, 200, 5))
-            for v_id, v in self.vehicles.items():
-                onestep_o = self.observations[v_id].observe(v)
-                self._update_pen_state(v)
-            scene_manager_before_step_infos = self.engine.before_step_traj(frame, wps)
+            scene_manager_before_step_infos = self.engine.before_step_macro(frame, wps)
             self.engine.step()
-
-            onestep_a = scene_manager_before_step_infos['default_agent']['raw_action']
-            onestep_rwd = 0
-            for v_id, v in self.vehicles.items():
-                onestep_rwd = self.calc_onestep_reward(v)
-            single_transition = {'state': onestep_o, 'action': onestep_a, 'reward': onestep_rwd}
-            if self.config["save_expert_data"]:
-                self.single_transition_list.append(single_transition)
             scene_manager_after_step_infos = self.engine.after_step()
         #scene_manager_after_step_infos = self.engine.after_step()
         return merge_dicts(
@@ -776,64 +743,52 @@ class MetaDriveTrajEnv(BaseEnv):
         o = None
         o_reset = None
         print('episode reward: {}'.format(self.episode_rwd))
-        #self.episode_rwd = 0
+        self.episode_rwd = 0
         self.step_num = 0
         for v_id, v in self.vehicles.items():
             self.observations[v_id].reset(self, v)
             ret[v_id] = self.observations[v_id].observe(v)
             o = self.observations[v_id].observe(v)
-            if self.config["save_expert_data"] and len(self.single_transition_list) > 50:
-                print('success: {}'.format(v.macro_succ))
-                print('traj len: {}'.format(len(self.single_transition_list)))
-                folder_name = self.config["expert_data_folder"]
-                file_num = len(os.listdir(folder_name))
-                new_file_name = "expert_data_%02i.pickle" % file_num
-                new_file_path = os.path.join(folder_name, new_file_name)
-                traj_dict = {"transition_list": self.single_transition_list, "episode_rwd": self.episode_rwd}
-                import pickle
-                with open(new_file_path, "wb") as fp:
-                    pickle.dump(traj_dict, fp)
-
             self.update_current_state(v_id)
             self.vel_speed = 0
             if self.config["traj_control_mode"] == 'jerk':
                 o_dict = {}
-                o_dict['birdview'] = o
+                o_dict['birdview'] = o 
                 # v_state = np.zeros(4)
                 # v_state[3] = v.last_spd
-                v_state = self.z_state
+                # v_state = self.z_state
+                v_state = np.zeros(6)
+                # v_state[3] = 5.0
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             elif self.config["traj_control_mode"] == 'acc':
                 o_dict = {}
-                o_dict['birdview'] = o
+                o_dict['birdview'] = o 
                 # v_state = np.zeros(4)
                 # v_state[3] = v.last_spd
-                v_state = self.z_state[:4]
+                # v_state = self.z_state[:6] #:4
+                v_state = np.zeros(6)
+                # v_state[3] = 5.0
                 o_dict['vehicle_state'] = v_state
                 #o_dict['speed'] = v.last_spd
             else:
                 o_dict = o
             o_reset = o_dict
             if hasattr(v, 'macro_succ'):
-                v.reset_state_stack()
                 v.macro_succ = False
             if hasattr(v, 'macro_crash'):
                 v.macro_crash = False
             v.penultimate_state = {}
-            v.penultimate_state['position'] = np.array([0, 0])
-            v.penultimate_state['yaw'] = 0
+            v.penultimate_state['position'] = np.array([0,0])
+            v.penultimate_state['yaw'] = 0 
             v.penultimate_state['speed'] = 0
-            v.traj_wp_list = []
+            v.traj_wp_list = [] 
             v.traj_wp_list.append(copy.deepcopy(v.penultimate_state))
             v.traj_wp_list.append(copy.deepcopy(v.penultimate_state))
             v.last_spd = 0
 
-        if self.config["save_expert_data"]:
-            self.single_transition_list = []
-        self.episode_rwd = 0.0
         self.already_go_dist = 0
-        self._compute_navi_dist = True
+        self._compute_navi_dist = True 
         self.navi_distance = 100.0
         self.remove_init_stop = True
         self.episode_max_step = self.config['episode_max_step']
@@ -855,8 +810,22 @@ class MetaDriveTrajEnv(BaseEnv):
         # other optional initialization
         self._after_lazy_init()
 
+    # def get_single_observation(self, _=None):
+    #     o = TopDownMultiChannel(
+    #         self.config["vehicle_config"],
+    #         self.config["on_screen"],
+    #         self.config["rgb_clip"],
+    #         frame_stack=3,
+    #         post_stack=10,
+    #         frame_skip=1,
+    #         resolution=(200, 200),
+    #         max_distance=50
+    #     )
+    #     #o = TopDownMultiChannel(vehicle_config, self, False)
+    #     return o
+    
     def get_single_observation(self, _=None):
-        o = TopDownMultiChannel(
+        o = HRLTopDownMultiChannel(
             self.config["vehicle_config"],
             self.config["on_screen"],
             self.config["rgb_clip"],
@@ -866,7 +835,6 @@ class MetaDriveTrajEnv(BaseEnv):
             resolution=(200, 200),
             max_distance=50
         )
-        #o = TopDownMultiChannel(vehicle_config, self, False)
         return o
 
     def wrap_angle(self, angle_in_rad):
@@ -877,14 +845,12 @@ class MetaDriveTrajEnv(BaseEnv):
             angle_in_rad += 2 * np.pi
         return angle_in_rad
 
-    def get_episode_max_step(self, distance, average_speed=6.5):
-        average_dist_per_step = float(self.config['seq_traj_len']
-                                      ) * average_speed * self.config['physics_world_step_size']
+    def get_episode_max_step(self, distance, average_speed = 6.5):
+        average_dist_per_step = float(self.config['seq_traj_len']) * average_speed * self.config['physics_world_step_size']
         max_step = int(distance / average_dist_per_step) + 1
         return max_step
 
-    def close(self):
-        if self.engine is not None:
-            close_engine()
-        if self._top_down_renderer is not None:
-            self._top_down_renderer.close()
+register(
+    id='HRL-v1',
+    entry_point='core.envs.md_traj_env:MetaDriveTrajEnv',
+)

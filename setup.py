@@ -49,8 +49,9 @@ setup(
         'pandas',
         'py-trees==0.8.3',
         'pygame',
+        'torch>=1.0,<=1.9',
         'torchvision',
-        'di-engine',
+        'di-engine>=0.2',
         'scikit-image',
         'setuptools==50',
         'shapely',
@@ -60,12 +61,10 @@ setup(
     ],
     extras_require={
         'doc': [
-            'protobuf<=3.20.1',
             'sphinx>=2.2.1',
             'sphinx_rtd_theme~=0.4.3',
             'enum_tools',
             'sphinx-toolbox',
-            'metadrive-simulator==0.2.4',
         ],
         'test': [
             'pytest==5.1.1',
@@ -81,7 +80,7 @@ setup(
             'flake8',
         ],
         'metadrive': [
-            'metadrive-simulator',
+            'metadrive-simulator==0.2.3',
         ],
     },
     classifiers=[

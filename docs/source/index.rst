@@ -9,12 +9,13 @@ DI-drive Documentation
 .. toctree::
     :maxdepth: 2
 
-.. figure:: ../figs/di-drive_banner.png
+.. figure:: ../figs/DI-drive.png
    :alt: DI-drive
+   :width: 300px
 
 Decision Intelligence Platform for Autonomous Driving simulation.
 
-Last updated on 2022.6.5
+Last updated on 2021.12.3
 
 -----
 
@@ -23,7 +24,7 @@ Last updated on 2022.6.5
 with **high ease of use** and **low difficulty to hands-on**.
 **DI-drive** designes **Casezoo** to make simulation environment closer to real driving.
 **DI-drive** develops Deep Learning driving policy with `Pytorch <http://pytorch.org>`_ and `DI-engine <https://github.com/opendilab/DI-engine>`_
-and supports `Carla <http://carla.org>`_ and `MetaDrive <https://decisionforce.github.io/metadrive>`_ simulator.
+and mainly uses `Carla <http://carla.org>`_ simulator.
 
 Main features for **DI-drive**
 ----------------------------------

@@ -53,12 +53,26 @@ class MacroTrafficManager(TrafficManager):
             self._create_respawn_vehicles(map, traffic_density)
         elif self.mode == TrafficMode.Trigger or self.mode == TrafficMode.Hybrid:
             self._create_vehicles_once(map, traffic_density)
+            self.trigger_vehicles_inter()
         elif self.mode == TrafficMode.Synch:
             #self._create_respawn_vehicles(map, traffic_density)
             self._create_synch_vehicles(map, traffic_density)
+            self.trigger_vehicles()
         else:
             raise ValueError("No such mode named {}".format(self.mode))
-        self.trigger_vehicles()
+
+    def trigger_vehicles_inter(self):
+        # This will triger all static vehicles to move
+        # Remember to wait untill all vehicles has fallen down
+        zt = 0
+        while len(self.block_triggered_vehicles) > 0:
+            if zt > 2:
+                break
+            block_vehicles = self.block_triggered_vehicles.pop()
+            self._traffic_vehicles += block_vehicles.vehicles
+            zt += 1
+
+
 
     def trigger_vehicles(self):
         # This will triger all static vehicles to move
@@ -73,13 +87,18 @@ class MacroTrafficManager(TrafficManager):
 
     def _create_synch_vehicles(self, map: BaseMap, traffic_density: float):
         vehicle_num = 0
+        traffic_general_density = traffic_density
         for block in map.blocks[1:]:
-            xb_dist = min(abs(block.bounding_box[0]), abs(block.bounding_box[1]))
-            yb_dist = min(abs(block.bounding_box[2]), abs(block.bounding_box[3]))
-            dist_constrain = 250
-            if xb_dist * xb_dist + yb_dist * yb_dist > dist_constrain * dist_constrain:
+            xb_dist = min(abs(block.bounding_box[0]),abs(block.bounding_box[1]))
+            yb_dist = min(abs(block.bounding_box[2]),abs(block.bounding_box[3]))
+            dist_constrain = 300#250
+            if xb_dist*xb_dist + yb_dist * yb_dist > dist_constrain *dist_constrain:
                 continue
             trigger_lanes = block.get_intermediate_spawn_lanes()
+            if block.ID == "O":
+                traffic_density = traffic_general_density - 0.10 #0.05
+            else:
+                traffic_density = traffic_general_density
             if self.engine.global_config["need_inverse_traffic"] and block.ID in ["S", "C", "r", "R"]:
                 neg_lanes = block.block_network.get_negative_lanes()
                 self.np_random.shuffle(neg_lanes)
@@ -116,6 +135,8 @@ class MacroTrafficManager(TrafficManager):
             vehicle_num += len(vehicles_on_block)
         self.block_triggered_vehicles.reverse()
         respawn_lanes = self._get_available_respawn_lanes(map)
+        # for lane in respawn_lanes:
+        #     self._traffic_vehicles += self._create_respawn_vehicles_with_density(traffic_density, lane, True)
 
     def _create_respawn_vehicles_with_density(self, traffic_density: float, lane: AbstractLane, is_respawn_lane):
         """
@@ -145,3 +166,58 @@ class MacroTrafficManager(TrafficManager):
             self.engine.add_policy(random_v.id, MacroIDMPolicy(random_v, self.generate_seed()))
             _traffic_vehicles.append(random_v)
         return _traffic_vehicles
+
+    def _create_vehicles_once(self, map: BaseMap, traffic_density: float) -> None:
+        """
+        Trigger mode, vehicles will be triggered only once, and disappear when arriving destination
+        :param map: Map
+        :param traffic_density: it can be adjusted each episode
+        :return: None
+        """
+        traffic_general_density = traffic_density
+        vehicle_num = 0
+        for block in map.blocks[1:]:
+            if block.ID == "X":
+                traffic_density = traffic_general_density - 0.10
+                traffic_density = traffic_density if traffic_density >0.0 else 0.0
+            else:
+                traffic_density = traffic_general_density
+
+            # Propose candidate locations for spawning new vehicles
+            trigger_lanes = block.get_intermediate_spawn_lanes()
+            if self.engine.global_config["need_inverse_traffic"] and block.ID in ["S", "C", "r", "R"]:
+                neg_lanes = block.block_network.get_negative_lanes()
+                self.np_random.shuffle(neg_lanes)
+                trigger_lanes += neg_lanes
+            potential_vehicle_configs = []
+            for lanes in trigger_lanes:
+                for l in lanes:
+                    if hasattr(self.engine, "object_manager") and l in self.engine.object_manager.accident_lanes:
+                        continue
+                    potential_vehicle_configs += self._propose_vehicle_configs(l)
+
+            # How many vehicles should we spawn in this block?
+            total_length = sum([lane.length for lanes in trigger_lanes for lane in lanes])
+            total_spawn_points = int(math.floor(total_length / self.VEHICLE_GAP))
+            total_vehicles = int(math.floor(total_spawn_points * traffic_density))
+
+            # Generate vehicles!
+            vehicles_on_block = []
+            self.np_random.shuffle(potential_vehicle_configs)
+            selected = potential_vehicle_configs[:min(total_vehicles, len(potential_vehicle_configs))]
+            # print("We have {} candidates! We are spawning {} vehicles!".format(total_vehicles, len(selected)))
+
+            from metadrive.policy.idm_policy import IDMPolicy
+            for v_config in selected:
+                vehicle_type = self.random_vehicle_type()
+                v_config.update(self.engine.global_config["traffic_vehicle_config"])
+                random_v = self.spawn_object(vehicle_type, vehicle_config=v_config)
+                self.engine.add_policy(random_v.id, IDMPolicy(random_v, self.generate_seed()))
+                vehicles_on_block.append(random_v)
+
+            trigger_road = block.pre_block_socket.positive_road
+            block_vehicles = BlockVehicles(trigger_road=trigger_road, vehicles=vehicles_on_block)
+
+            self.block_triggered_vehicles.append(block_vehicles)
+            vehicle_num += len(vehicles_on_block)
+        self.block_triggered_vehicles.reverse()

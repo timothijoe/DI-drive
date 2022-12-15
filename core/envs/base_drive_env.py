@@ -10,7 +10,7 @@ from easydict import EasyDict
 import gym
 from gym import utils
 
-from ding.utils.default_helper import deep_merge_dicts
+from core.utils.others.config_helper import deep_merge_dicts
 
 
 class BaseDriveEnv(gym.Env, utils.EzPickle):

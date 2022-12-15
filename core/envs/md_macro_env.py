@@ -6,12 +6,13 @@ import numpy as np
 from gym import spaces
 from collections import defaultdict
 from typing import Union, Dict, AnyStr, Tuple, Optional
+from gym.envs.registration import register
 import logging
 
-from ding.utils import ENV_REGISTRY
 from core.utils.simulator_utils.md_utils.discrete_policy import DiscreteMetaAction
 from core.utils.simulator_utils.md_utils.agent_manager_utils import MacroAgentManager
-from core.utils.simulator_utils.md_utils.engine_utils import MacroEngine
+from core.utils.simulator_utils.md_utils.engine_utils import initialize_engine, close_engine, \
+    engine_initialized, set_global_random_seed, MacroBaseEngine
 from core.utils.simulator_utils.md_utils.traffic_manager_utils import TrafficMode
 
 from metadrive.envs.base_env import BaseEnv
@@ -20,7 +21,7 @@ from metadrive.component.map.pg_map import parse_map_config, MapGenerateMethod
 # from metadrive.manager.traffic_manager import TrafficMode
 from metadrive.component.pgblock.first_block import FirstPGBlock
 from metadrive.constants import DEFAULT_AGENT, TerminationState
-from metadrive.engine.base_engine import BaseEngine
+from metadrive.component.vehicle.base_vehicle import BaseVehicle
 from metadrive.utils import Config, merge_dicts, get_np_random, clip
 
 from metadrive.envs.base_env import BASE_DEFAULT_CONFIG
@@ -45,7 +46,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     },
 
     # ===== Traffic =====
-    traffic_density=0.3,
+    traffic_density=0.2,
     on_screen=False,
     rgb_clip=True,
     need_inverse_traffic=False,
@@ -96,20 +97,7 @@ DIDRIVE_DEFAULT_CONFIG = dict(
 )
 
 
-@ENV_REGISTRY.register("md_macro")
 class MetaDriveMacroEnv(BaseEnv):
-    """
-    MetaDrive single-agent env controlled by a "macro" action. The agent is controlled by
-    a discrete action set. Each one related to a series of control signals that can complish
-    the macro action defined in the set. The observation is a top-down view image with 5 channel
-    containing the temporary and history information of surroundings. This env is registered
-    and can be used via `gym.make`.
-
-    :Arguments:
-        - config (Dict): Env config dict.
-
-    :Interfaces: reset, step, close, render, seed
-    """
 
     @classmethod
     def default_config(cls) -> "Config":
@@ -120,7 +108,7 @@ class MetaDriveMacroEnv(BaseEnv):
         config["map_config"].register_type("config", None)
         return config
 
-    def __init__(self, config: dict = None) -> None:
+    def __init__(self, config: dict = None):
         merged_config = self._merge_extra_config(config)
         global_config = self._post_process_config(merged_config)
         self.config = global_config
@@ -140,7 +128,7 @@ class MetaDriveMacroEnv(BaseEnv):
         #self.action_space = self.action_type.space()
 
         # lazy initialization, create the main vehicle in the lazy_init() func
-        self.engine: Optional[BaseEngine] = None
+        self.engine: Optional[MacroBaseEngine] = None
         self._top_down_renderer = None
         self.episode_steps = 0
         # self.current_seed = None
@@ -157,7 +145,11 @@ class MetaDriveMacroEnv(BaseEnv):
 
     def step(self, actions: Union[np.ndarray, Dict[AnyStr, np.ndarray]]):
         self.episode_steps += 1
-        macro_actions = self._preprocess_macro_actions(actions)
+        action_seq = []
+        for i in range(31):
+            action_seq.append([actions[i], actions[i+1]])
+        action_seq =  np.array(action_seq)
+        macro_actions = self._preprocess_macro_actions(action_seq)
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
         #o = o.transpose((2,0,1))
@@ -361,7 +353,7 @@ class MetaDriveMacroEnv(BaseEnv):
         if not self.is_multi_agent:
             # print('action.dtype: {}'.format(type(actions)))
             #print('action: {}'.format(actions))
-            actions = int(actions)
+            #actions = int(actions)
             actions = {v_id: actions for v_id in self.vehicles.keys()}
         else:
             if self.config["vehicle_config"]["action_check"]:
@@ -385,7 +377,7 @@ class MetaDriveMacroEnv(BaseEnv):
         frames = int(simulation_frequency / policy_frequency)
         self.time = 0
         #print('di action pairs: {}'.format(actions))
-        actions = {vid: self.action_type.actions[vvalue] for vid, vvalue in actions.items()}
+        #actions = {vid: self.action_type.actions[vvalue] for vid, vvalue in actions.items()}
         for frame in range(frames):
             if self.time % int(simulation_frequency / policy_frequency) == 0:
                 scene_manager_before_step_infos = self.engine.before_step_macro(actions)
@@ -423,12 +415,12 @@ class MetaDriveMacroEnv(BaseEnv):
                 v.macro_crash = False
         # zt_obs = zt_obs.transpose((2,0,1))
         # print('process: {}  --- > initializing: a new episode begins'.format(os.getpid()))
-        self.remove_init_stop = False
+        self.remove_init_stop = True
         if self.remove_init_stop:
             return o
         for i in range(8):
             o, r, d, info = self.step(self.action_type.actions_indexes["Holdon"])
-        for v_id, v in self.vehicles.items():
+        for v_id ,v in self.vehicles.items():
             if hasattr(v, 'macro_succ'):
                 p = self.engine.get_policy(v.name)
                 target_speed = p.NORMAL_SPEED * 0.1
@@ -444,10 +436,9 @@ class MetaDriveMacroEnv(BaseEnv):
         :return: None
         """
         # It is the true init() func to create the main vehicle and its module, to avoid incompatible with ray
-        if MacroEngine.singleton is not None:
+        if engine_initialized():
             return
-        MacroEngine.singleton = MacroEngine(self.config)
-        self.engine = MacroEngine.singleton
+        self.engine = initialize_engine(self.config)
         # engine setup
         self.setup_engine()
         # other optional initialization
@@ -466,3 +457,9 @@ class MetaDriveMacroEnv(BaseEnv):
         )
         #o = TopDownMultiChannel(vehicle_config, self, False)
         return o
+
+
+register(
+    id='Macro-v1',
+    entry_point='core.envs.md_macro_env:MetaDriveMacroEnv',
+)

@@ -8,11 +8,43 @@ from itertools import product
 from core.data.benchmark import ALL_SUITES
 from core.eval.carla_benchmark_evaluator import get_suites_list, read_pose_txt, get_benchmark_dir
 from .base_drive_env import BaseDriveEnv
-from ding.utils.default_helper import deep_merge_dicts
-from ding.envs.env.base_env import BaseEnvTimestep
+from core.utils.others.config_helper import deep_merge_dicts
+from ding.envs.env.base_env import BaseEnvTimestep, BaseEnvInfo
 from ding.envs.common.env_element import EnvElementInfo
 from ding.torch_utils.data_helper import to_ndarray
+import matplotlib.pyplot as plt
 
+def draw_multi_channels_top_down_observation(obs, show_time=4):
+    obs = obs['birdview']
+    num_channels = obs.shape[-1]
+    assert num_channels == 5
+    channel_names = [
+        "Road and navigation", "Ego now and previous pos", "Neighbor at step t", "Neighbor at step t-1",
+        "Neighbor at step t-2"
+    ]
+    fig, axs = plt.subplots(1, num_channels, figsize=(15, 4), dpi=80)
+    count = 0
+
+    def close_event():
+        plt.close()  # timer calls this function after 3 seconds and closes the window
+
+    timer = fig.canvas.new_timer(
+        interval=show_time * 1000
+    )  # creating a timer object and setting an interval of 3000 milliseconds
+    timer.add_callback(close_event)
+
+    for i, name in enumerate(channel_names):
+        count += 1
+        ax = axs[i]
+        ax.imshow(obs[..., i], cmap="bone")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(name)
+        # print("Drawing {}-th semantic map!".format(count))
+    fig.suptitle("Multi-channels Top-down Observation")
+    timer.start()
+    plt.show()
+    plt.close()
 
 class DriveEnvWrapper(gym.Wrapper):
     """
@@ -37,8 +69,6 @@ class DriveEnvWrapper(gym.Wrapper):
         else:
             self._cfg = cfg
         self.env = env
-        if not hasattr(self.env, 'reward_space'):
-            self.reward_space = gym.spaces.Box(low=-float('inf'), high=float('inf'), shape=(1, ))
 
     def reset(self, *args, **kwargs) -> Any:
         """
@@ -53,9 +83,11 @@ class DriveEnvWrapper(gym.Wrapper):
         if isinstance(obs, np.ndarray) and len(obs.shape) == 3:
             obs = obs.transpose((2, 0, 1))
         elif isinstance(obs, dict):
-            birdview = obs['birdview'].transpose((2, 0, 1))
-            obs = {'birdview': birdview, 'vehicle_state': obs['vehicle_state']}
+            vehicle_state = obs['vehicle_state']
+            birdview = obs['birdview'].transpose((2,0,1))
+            obs = {'vehicle_state': vehicle_state, 'birdview': birdview}
         self._final_eval_reward = 0.0
+        self._arrive_dest = False
         return obs
 
     def step(self, action: Any = None) -> BaseEnvTimestep:
@@ -74,22 +106,56 @@ class DriveEnvWrapper(gym.Wrapper):
         action = to_ndarray(action)
 
         obs, rew, done, info = self.env.step(action)
+        #draw_multi_channels_top_down_observation(obs, show_time=4.5)
         self._final_eval_reward += rew
         obs = to_ndarray(obs, dtype=np.float32)
         if isinstance(obs, np.ndarray) and len(obs.shape) == 3:
             obs = obs.transpose((2, 0, 1))
         elif isinstance(obs, dict):
-            birdview = obs['birdview'].transpose((2, 0, 1))
-            obs = {'birdview': birdview, 'vehicle_state': obs['vehicle_state']}
+            vehicle_state = obs['vehicle_state']
+            birdview = obs['birdview'].transpose((2,0,1))
+            obs = {'vehicle_state': vehicle_state, 'birdview': birdview}
         rew = to_ndarray([rew], dtype=np.float32)
         if done:
             info['final_eval_reward'] = self._final_eval_reward
+            info['complete_ratio'] = info['complete_ratio']
+            #print('seq traj len: {}'.format(info['seq_traj_len']))
+
         return BaseEnvTimestep(obs, rew, done, info)
 
     def seed(self, seed: int, dynamic_seed: bool = True) -> None:
         self._seed = seed
         self._dynamic_seed = dynamic_seed
         np.random.seed(self._seed)
+
+    def info(self) -> BaseEnvInfo:
+        """
+        Interface of ``info`` method to suit DI-engine format env.
+        It returns a namedtuple ``BaseEnvInfo`` defined in DI-engine
+        which contains information about observation, action and reward space.
+
+        :Returns:
+            BaseEnvInfo: Env information instance defined in DI-engine.
+        """
+        obs_space = EnvElementInfo(shape=self.env.observation_space, value={'min': 0., 'max': 1., 'dtype': np.float32})
+        act_space = EnvElementInfo(
+            shape=self.env.action_space,
+            value={
+                'min': np.float32("-inf"),
+                'max': np.float32("inf"),
+                'dtype': np.float32
+            },
+        )
+        rew_space = EnvElementInfo(
+            shape=1,
+            value={
+                'min': np.float32("-inf"),
+                'max': np.float32("inf")
+            },
+        )
+        return BaseEnvInfo(
+            agent_num=1, obs_space=obs_space, act_space=act_space, rew_space=rew_space, use_wrappers=None
+        )
 
     def enable_save_replay(self, replay_path: Optional[str] = None) -> None:
         if replay_path is None:

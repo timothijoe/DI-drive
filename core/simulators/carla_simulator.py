@@ -69,7 +69,7 @@ class CarlaSimulator(BaseSimulator):
     The simulator stores and gets some information from a static class ``CarlaDataProvider``
     to avoid frequently sending message to Carla server and speed up.
 
-    Up to now, it uses Carla version higher than 0.9.9.
+    Up to now, it uses Carla version 0.9.9.
 
     If no traffic manager port is provided, it will find random free port in system.
 
@@ -79,7 +79,7 @@ class CarlaSimulator(BaseSimulator):
         - host (str, optional): TCP host Carla client link to. Defaults to 'localhost'.
         - port (int, optional): TCP port Carla client link to. Defaults to 9000.
         - tm_port (int, optional): Traffic manager port Carla client link to. Defaults to None.
-        - timeout (float, optional): Carla client link timeout. Defaults to 60.0.
+        - timeout (float, optional): Carla client link timeout. Defaults to 10.0.
 
     :Interfaces:
         init, get_state, get_sensor_data, get_navigation, get_information, apply_planner,
@@ -122,7 +122,7 @@ class CarlaSimulator(BaseSimulator):
             host: str = 'localhost',
             port: int = 9000,
             tm_port: Optional[int] = None,
-            timeout: float = 60.0,
+            timeout: float = 10.0,
             **kwargs
     ) -> None:
         """

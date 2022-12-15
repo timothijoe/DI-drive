@@ -1,0 +1,73 @@
+apiVersion: diengine.opendilab.org/v2alpha1
+kind: DIJob
+metadata:
+  # name: ez-pong-ctree-lr02-upc1000-ns50-tp025
+  # name: ez-pong-ctree-halfmodel-base
+  # name: ez-pong-ctree-originalmodel-fix
+  # name: ez-pong-ptree-lr02-upc200-ns50-tp025
+  # name: ez-tictactoe-ptree-2pm-ftv025
+  name: zt2-expcc-nov01
+
+spec:
+  priority: "normal"  # 表示job的优先级，保留字段，调度中或许可以用到
+  backoffLimit: 0  # 重启次数，可以为nil，表示无限重启；默认为3
+  cleanPodPolicy: "Running"  # 表示job运行完成之后，如何处理worker pods
+  preemptible: false  # 表示job是否允许被抢占，调度中对job资源改动之后涉及到抢占操作
+  tasks:
+  - replicas: 1
+    type: none
+    name: serial
+    template:
+      spec:
+        containers:
+        - name: di-container
+          image: registry.sensetime.com/xlab/ding:nightly-atari  # user-defined image
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: PYTHONUNBUFFERED
+            value: "1"
+          resources:
+            requests:
+              nvidia.com/gpu-a100: 1  # user-defined resource
+              cpu: 20
+              memory: "130Gi"
+            limits:
+              nvidia.com/gpu-a100: 1
+              cpu: 25
+              memory: "150Gi"
+          command: ["/bin/bash", "-c",]
+          args:  # user-defined execution commands
+          - |
+            export http_proxy=http://proxy.sensetime.com:3128/
+            export https_proxy=http://proxy.sensetime.com:3128/
+            export HTTP_PROXY=http://proxy.sensetime.com:3128/
+            export HTTPS_PROXY=http://proxy.sensetime.com:3128/
+
+            cd /mnt/lustre/zhoutong/august/DI-engine
+            # pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+            pip install -e . -i https://pkg.sensetime.com/repository/pypi-proxy/simple/ --trusted-host pkg.sensetime.com 
+            pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+            cd /mnt/lustre/zhoutong/august/metadrive
+            pip install -e . -i https://pkg.sensetime.com/repository/pypi-proxy/simple/ --trusted-host pkg.sensetime.com 
+            pip install mpire -i https://pkg.sensetime.com/repository/pypi-proxy/simple/ --trusted-host pkg.sensetime.com
+            cd /mnt/lustre/zhoutong/august/xad
+            pip install -e . -i https://pkg.sensetime.com/repository/pypi-proxy/simple/ --trusted-host pkg.sensetime.com 
+            cd /mnt/lustre/zhoutong/august/data_xad
+            python3 -u /mnt/lustre/zhoutong/august/xad/review_test/train/nov01/z2_expcc_len10_99.py
+
+          volumeMounts:
+          - name: work-dir
+            mountPath: /mnt/lustre/zhoutong  # user-defined file volume
+          - name: env-dir
+            mountPath: /mnt/cache/zhoutong  # user-defined file volume
+        volumes:
+        - name: cache-volume
+          emptyDir:
+            medium: Memory
+            sizeLimit: 128Mi
+        - name: work-dir
+          hostPath:
+            path: /mnt/lustre/zhoutong  # user-defined file volume
+        - name: env-dir
+          hostPath:
+            path: /mnt/cache/zhoutong  # user-defined file volume

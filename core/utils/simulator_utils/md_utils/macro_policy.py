@@ -13,6 +13,7 @@ from metadrive.examples import expert
 from metadrive.policy.env_input_policy import EnvInputPolicy
 from direct.controls.InputState import InputState
 from metadrive.engine.engine_utils import get_global_config
+from metadrive.utils import norm 
 
 
 #from metadrive.policy.discrete_policy import ActionType, DiscreteMetaAction
@@ -161,12 +162,38 @@ class ManualMacroDiscretePolicy(BasePolicy):
         self.lateral_pid = PIDController(0.2, .002, 0.3)
         self.DELTA_SPEED = 10
         self.DELTA = 10
-        self.target_lane = self.get_neighboring_lanes()[1]
+        #self.target_lane = self.get_neighboring_lanes()[1]
         self.target_speed = self.NORMAL_SPEED
         self.stop_label = True
+        self.base_pos = self.control_object.position
+        self.base_heading = self.control_object.heading_theta
+        self.last_heading = self.base_heading
+
+    def convert_wp_to_world_coord(self, rbt_pos, rbt_heading, wp, visual=False):
+        compose_visual = 0
+        if visual:
+            compose_visual += 0 # 4.51 / 2
+        theta = np.arctan2(wp[1], wp[0] + compose_visual)
+        rbt_heading = rbt_heading#np.arctan2(rbt_heading[1], rbt_heading[0])
+        theta = wrap_to_pi(rbt_heading) + wrap_to_pi(theta)
+        norm_len = norm(wp[0] + compose_visual, wp[1])
+        position = rbt_pos
+        #position += 4.51 /2
+        heading = np.sin(theta) * norm_len
+        side = np.cos(theta) * norm_len
+        return position[0] + side, position[1] + heading
+
+    def convert_waypoint_list_coord(self, rbt_pos, rbt_heading, wp_list, visual = False):
+        wp_w_list = []
+        LENGTH = 4.51
+        for wp in wp_list:
+            # wp[0] = wp[0] + LENGTH / 2
+            wp_w = self.convert_wp_to_world_coord(rbt_pos, rbt_heading, wp, visual)
+            wp_w_list.append(wp_w)
+        return wp_w_list
 
     def act(self, *args, **kwargs):
-        lanes = self.get_neighboring_lanes()
+        #lanes = self.get_neighboring_lanes()
         if (self.control_object.arrive_destination and hasattr(self.control_object, 'macro_succ')):
             self.control_object.macro_succ = True
             #print('arrive dest zt')
@@ -176,6 +203,90 @@ class ManualMacroDiscretePolicy(BasePolicy):
         #print('vel: {}'.format(self.control_object.velocity))
         if (len(args) >= 2):
             macro_action = args[1]
+        frame = args[1]
+        wp_list = args[2]
+        #print('waypoint list initial: {}, {}'.format(wp_list[0][0], wp_list[0][1]))
+        ego_vehicle = self.control_object
+        if frame ==0:
+            self.base_pos = ego_vehicle.position
+            self.base_heading = ego_vehicle.heading_theta
+            self.control_object.v_wps = self.convert_waypoint_list_coord(self.base_pos, self.base_heading,wp_list, True)
+            self.control_object.penultimate_state = self.control_object.traj_wp_list[-2] # if len(wp_list)>2 else self.control_object.traj_wp_list[-1]
+            new_state = {}        
+            new_state['position'] = ego_vehicle.position
+            new_state['yaw'] = ego_vehicle.heading_theta
+            new_state['speed'] = ego_vehicle.last_spd
+            self.control_object.traj_wp_list = []
+            self.control_object.traj_wp_list.append(new_state)
+        #frame = 0
+        self.control_object.v_indx = frame 
+        wp_list = self.convert_waypoint_list_coord(self.base_pos, self.base_heading, wp_list)
+        #print(frame)
+        #print('traj len: {}'.format(len(wp_list)))
+        current_pos = np.array(wp_list[frame])
+        target_pos = np.array(wp_list[frame+1])
+
+        #print(wp_list[frame+1])
+        diff = target_pos - current_pos 
+        norm = np.sqrt(diff[0] * diff[0] + diff[1] * diff[1])
+        
+        # if abs(norm) > 0.001 else self.last_heading
+        # self.last_heading = direction
+        # direction_lateral = np.array([-direction[1], direction[0]])
+        # target_vel = norm / 0.3 * 3.6
+        # vehicle_pos = self.control_object.position
+        # delta_x = vehicle_pos[0] - current_pos[0]
+        # delta_y = vehicle_pos[1] - current_pos[1]
+        # lateral_dist = delta_x * direction_lateral[0] + delta_y * direction_lateral[1]
+        # lateral = float(lateral_dist)
+        #heading_theta_at = np.arctan2(direction[1], direction[0])
+        if abs(norm) < 0.001:
+            heading_theta_at = self.last_heading
+        else:
+            direction = diff / norm 
+            heading_theta_at = np.arctan2(direction[1], direction[0])
+        self.last_heading = heading_theta_at 
+        steering = 0#self.steering_conrol_traj(lateral, heading_theta_at)
+        throtle_brake = 0 #self.speed_control(target_vel)
+        # print('target_vel: {}'.format(target_vel))
+        # print('target_heading_theta: {}'.format(heading_theta_at))
+        ttarget_pos = self.base_pos + target_pos
+        hheading_theata_at = heading_theta_at + self.base_heading
+        #print('target frame: {} with position ({}, {}) and orientation {}'.format(frame, target_pos[0], target_pos[1], heading_theta_at))
+        ego_vehicle.set_position(target_pos)
+        ego_vehicle.set_heading_theta(heading_theta_at)
+        ego_vehicle.last_spd = norm / ego_vehicle.physics_world_step_size
+        new_state = {}
+        new_state['position'] = target_pos
+        new_state['yaw'] = heading_theta_at
+        new_state['speed'] = ego_vehicle.last_spd
+        self.control_object.traj_wp_list.append(new_state)
+
+        if hasattr(self.control_object, 'taecrl_max_spd'):
+            if hasattr(self.control_object, 'taecrl_max_steer') and hasattr(self.control_object, 'taecrl_max_acc') :
+                if hasattr(self.control_object, 'vis_state'):
+                    steering = self.control_object.vis_state[5] / self.control_object.taecrl_max_steer
+                    if steering > 1.0:
+                        steering = 1.0
+                    elif steering < -1.0:
+                        steering = -1.0
+                    throtle_brake = self.control_object.vis_state[4] / self.control_object.taecrl_max_acc
+                    if throtle_brake > 1.0:
+                        throtle_brake = 1.0
+                    elif throtle_brake < -1.0:
+                        throtle_brake = -1.0
+
+        #print(ego_vehicle.physics_world_step_size)
+        #ego_vehicle.last_spd = norm / 0.03 * 3.6
+        #ego_vehicle.set_velocity(heading_theta_at, norm / 0.03 *3.6)
+        
+        #throtle_brake = throtle_brake if self.stop_label is False else -1
+        return [steering, throtle_brake]
+        
+
+
+        
+
 
         if self.manual is True:
             if self.inputs.isSet('laneLeft'):
@@ -209,46 +320,12 @@ class ManualMacroDiscretePolicy(BasePolicy):
             self.target_lane = current_lane
         else:
             pass
-            # current_lane = lanes[1]
-            # self.target_lane = current_lane
 
         steering = self.steering_control(self.target_lane)
         throtle_brake = self.speed_control(self.target_speed)
         throtle_brake = throtle_brake if self.stop_label is False else -1
-        #print('throtle_brake: {}'.format(throtle_brake))
         return [steering, throtle_brake]
 
-        # steering = 0.0
-        # throtle_brake = 0.0
-        # centre_lane = lanes[1]
-        # #print(lanes)
-        # target_lane = centre_lane
-        # if centre_lane is None:
-        #     return [steering, throtle_brake]
-        # if self.inputs.isSet('accelerate'):
-        #     throtle_brake = 1.0
-        # elif self.inputs.isSet('deccelerate'):
-        #     throtle_brake = -1.0
-        # if self.inputs.isSet('laneLeft'):
-        #     left_lane = lanes[0]
-        #     if left_lane is None:
-        #         pass
-        #         #steering = self.steering_control(centre_lane)
-        #     else:
-        #         target_lane = left_lane
-        #         #steering = self.steering_control(left_lane)
-        # elif self.inputs.isSet('laneRight'):
-        #     right_lane = lanes[2]
-        #     if right_lane is None:
-        #         pass
-        #         #steering = self.steering_control(centre_lane)
-        #     else:
-        #         target_lane = right_lane
-        #         #steering = self.steering_control(right_lane)
-        # else:
-        #     pass
-        # steering = self.steering_control(target_lane)
-        # return [steering, throtle_brake]
 
     def get_neighboring_lanes(self):
         ref_lanes = self.control_object.navigation.current_ref_lanes
@@ -321,6 +398,13 @@ class ManualMacroDiscretePolicy(BasePolicy):
         lane_heading = target_lane.heading_theta_at(long + 1)
         v_heading = ego_vehicle.heading_theta
         steering = self.heading_pid.get_result(wrap_to_pi(lane_heading - v_heading)) * 1.5
+        steering += self.lateral_pid.get_result(-lat)
+        return float(steering)
+    
+    def steering_conrol_traj(self, lat, lane_heading):
+        ego_vehicle = self.control_object
+        v_heading = ego_vehicle.heading_theta
+        steering = self.heading_pid.get_result(wrap_to_pi(lane_heading - v_heading))
         steering += self.lateral_pid.get_result(-lat)
         return float(steering)
 
