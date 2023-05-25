@@ -134,6 +134,10 @@ DIDRIVE_DEFAULT_CONFIG = dict(
     use_jerk_reward = False,
     ignore_first_steer = False,
     add_extra_speed_penalty = False,
+
+    save_expert_data=False,
+    expert_data_folder=None,
+
 )
 
 
@@ -209,7 +213,10 @@ class MetaDriveTrajEnv(BaseEnv):
         self.vel_speed = 0.0
         self.z_state = np.zeros(6)
         self.avg_speed = self.config["avg_speed"]
-
+        self.last_obs = None
+        if self.config["save_expert_data"]:
+            assert self.config["expert_data_folder"] is not None
+            self.single_transition_list = []
     # define a action type, and execution style
     # Now only one action will be taken, cosin function, and we set dt equals self.engine.dt
     # now that in this situation, we directly set trajectory len equals to simulation frequency
@@ -237,6 +244,12 @@ class MetaDriveTrajEnv(BaseEnv):
         #     trajs = trajs[:,:,:2]
         #     trajs = torch.squeeze(trajs, 0)
         #     actions = trajs.numpy()
+        if isinstance(actions, dict):
+            latent_action = actions['latent_action']
+            actions = actions['trajectory']
+        single_transition = {'observation': self.last_obs, 'latent_action': latent_action, 'trajectory': actions}
+        if self.config["save_expert_data"]:
+            self.single_transition_list.append(single_transition)
         macro_actions = self._preprocess_macro_waypoints(actions)
         step_infos = self._step_macro_simulator(macro_actions)
         o, r, d, i = self._get_step_return(actions, step_infos)
@@ -631,6 +644,7 @@ class MetaDriveTrajEnv(BaseEnv):
             else:
                 o_dict = o
             obses[v_id] = o_dict
+            self.last_obs = copy.deepcopy(o_dict)
 
             done_function_result, done_infos[v_id] = self.done_function(v_id)
             rewards[v_id], reward_infos[v_id] = self.reward_function(v_id)
@@ -749,6 +763,26 @@ class MetaDriveTrajEnv(BaseEnv):
             self.observations[v_id].reset(self, v)
             ret[v_id] = self.observations[v_id].observe(v)
             o = self.observations[v_id].observe(v)
+
+            if self.config["save_expert_data"] and len(self.single_transition_list) > 10:
+                print('success: {}'.format(v.macro_succ))
+                print('traj len: {}'.format(len(self.single_transition_list)))
+                folder_name = self.config["expert_data_folder"]
+                file_num = len(os.listdir(folder_name))
+                new_file_name = "expert_data_%02i.pickle" % file_num
+                new_file_path = os.path.join(folder_name, new_file_name)
+                is_succ = False 
+                if v.macro_succ or v.arrive_destination:
+                    is_succ = True
+                pick_single_transition_list = self.single_transition_list
+                if not is_succ:
+                    pick_single_transition_list = pick_single_transition_list[:-2]
+                traj_dict = {"transition_list": pick_single_transition_list, "episode_rwd": self.episode_rwd, 'is_succ': is_succ}
+                import pickle
+                with open(new_file_path, "wb") as fp:
+                    pickle.dump(traj_dict, fp)
+                self.single_transition_list = []
+
             self.update_current_state(v_id)
             self.vel_speed = 0
             if self.config["traj_control_mode"] == 'jerk':
@@ -774,6 +808,7 @@ class MetaDriveTrajEnv(BaseEnv):
             else:
                 o_dict = o
             o_reset = o_dict
+            self.last_obs = copy.deepcopy(o_dict)
             if hasattr(v, 'macro_succ'):
                 v.macro_succ = False
             if hasattr(v, 'macro_crash'):

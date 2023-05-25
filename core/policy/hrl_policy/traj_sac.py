@@ -268,7 +268,10 @@ class TrajSAC(SACPolicy):
             output = {'latent_action': action}
             traj = self._eval_model.generate_traj_from_lat(output['latent_action'], init_state)
             output['trajectory'] = traj 
-            output['action'] = traj 
+            #output['action'] = traj 
+            traj_info = {'latent_action': action}
+            traj_info['trajectory'] = traj 
+            output['action'] = traj_info 
         if self._cuda:
             output = to_device(output, 'cpu')
         output = default_decollate(output)
