@@ -40,14 +40,14 @@ metadrive_basic_config = dict(
     env=dict(
         metadrive=dict(use_render=True,
             show_seq_traj = True,
-            traffic_density = 0.45, #0.20
+            traffic_density = 0.30, #0.20
             # need_inverse_traffic=True, #True
 
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             
             # map='SOSO', 
-            map='OSOS',
+            #map='OSOS',
             # map='SXSX',
             # map = 'XSXS',
             # map='SXSX',
@@ -172,7 +172,7 @@ def main(cfg):
     dir='/home/SENSETIME/zhoutong/luster/nov4/inter/iteration_14008.pth.tar'
     dir = '/home/SENSETIME/zhoutong/luster/nov4/inter/try_12000_with_uturn.pth.tar'
     dir = '/home/SENSETIME/zhoutong/luster/nov7/ckpt/inter_uturn/iteration_18000.pth.tar'
-    dir = '/home/zhoutong/hoffung/ztaecrl_ckpt/iteration_70000_round.pth.tar'
+    dir = '/home/zhoutong/hoffung/ztaecrl_ckpt/iteration_70000_straight.pth.tar'
 
     policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load(dir))

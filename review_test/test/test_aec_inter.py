@@ -28,35 +28,32 @@ VAE_LOAD_DIR='/home/SENSETIME/zhoutong/hoffnung/Trajectory_VAE/result/zNov-v7-le
 VAE_LOAD_DIR = '/mnt/lustre/zhoutong/august/xad/traj_model/oct_seq_len10_dim3_nov1_ckpt'
 VAE_LOAD_DIR = 'traj_model/oct_seq_len10_dim3_nov1_ckpt'
 VAE_LOAD_DIR = 'traj_model/oct_seq_len10_dim3_withtan_nov1_ckpt'
-VAE_LOAD_DIR="traj_model/nov02_len10_dim3_v1_ckpt"
+VAE_LOAD_DIR="/home/SENSETIME/zhoutong/hoffnung/Trajectory_VAE/result/ztNov2-v3-len10-dim3-kllager/ckpt/99_decoder_ckpt"
 # VAE_LOAD_DIR='/home/SENSETIME/zhoutong/hoffnung/Trajectory_VAE/result/zNov-v5-len10-dim3-notanh-kllager/ckpt/95_decoder_ckpt'
 # VAE_LOAD_DIR='traj_model/oct30_v2_decoder_ckpt'
-from ding.utils import set_pkg_seed
-EXPP_SEED = 1
-
+VAE_LOAD_DIR="traj_model/nov02_len10_dim3_v1_ckpt"
 metadrive_basic_config = dict(
     exp_name = 'metadrive_basic_sac',
-    seed = EXPP_SEED,
     env=dict(
         metadrive=dict(use_render=True,
             show_seq_traj = True,
             traffic_density = 0.45, #0.20
-            # need_inverse_traffic=True, #True
+            need_inverse_traffic=False, #True
 
             seq_traj_len = SEQ_TRAJ_LEN,
             traj_control_mode = TRAJ_CONTROL_MODE,
             
-            # map='SOSO', 
-            map='OSOS',
+            # map='OSOS', 
+            # map='SOSO',
             # map='SXSX',
             # map = 'XSXS',
-            # map='SXSX',
-            # enable_u_turn = True,
-            # traffic_mode=TrafficMode.Trigger,
-            avg_speed = 6.0,
+            map='SXSX',
+            enable_u_turn = True,
+            traffic_mode=TrafficMode.Trigger,
+            avg_speed = 4.0,
 
 
-            #show_interface=False,
+            show_interface=False,
             use_lateral=True,
             use_speed_reward = True,
             use_heading_reward = True,
@@ -142,17 +139,6 @@ def main(cfg):
         cfg=cfg.env.manager,
     )
 
-
-
-    # collector_env.seed(cfg.seed)
-    # evaluator_env.seed(cfg.seed, dynamic_seed=False)
-    # set_pkg_seed(cfg.seed, use_cuda=cfg.policy.cuda)
-
-
-    collector_env.seed(EXPP_SEED)
-    evaluator_env.seed(EXPP_SEED, dynamic_seed=False)
-    set_pkg_seed(EXPP_SEED, use_cuda=cfg.policy.cuda)
-
     model = ConvQAC(**cfg.policy.model)
     policy = TrajSAC(cfg.policy, model=model)
 
@@ -171,9 +157,10 @@ def main(cfg):
     dir='/home/SENSETIME/zhoutong/luster/nov4/round/iteration_25000.pth.tar'
     dir='/home/SENSETIME/zhoutong/luster/nov4/inter/iteration_14008.pth.tar'
     dir = '/home/SENSETIME/zhoutong/luster/nov4/inter/try_12000_with_uturn.pth.tar'
-    dir = '/home/SENSETIME/zhoutong/luster/nov7/ckpt/inter_uturn/iteration_18000.pth.tar'
-    dir = '/home/zhoutong/hoffung/ztaecrl_ckpt/iteration_70000_round.pth.tar'
-
+    dir = '/home/SENSETIME/zhoutong/luster/nov7/ckpt/inter_uturn/iteration_24006.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/luster/nov8/exp3_inter/iteration_15000.pth.tar'
+    dir = '/home/SENSETIME/zhoutong/luster/ral_expert_ckpt/inter/iter_15000_another.pth.tar'
+    dir = '/home/zhoutong/hoffung/ztaecrl_ckpt/iteration_75000_inter.pth.tar'
     policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load(dir))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))

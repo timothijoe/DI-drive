@@ -40,7 +40,7 @@ metadrive_basic_config = dict(
     env=dict(
         metadrive=dict(use_render=True,
             show_seq_traj = True,
-            traffic_density = 0.45, #0.20
+            traffic_density = 0.30, #0.20
             # need_inverse_traffic=True, #True
 
             seq_traj_len = SEQ_TRAJ_LEN,
