@@ -29,6 +29,7 @@ VAE_LOAD_DIR = '/mnt/lustre/zhoutong/august/xad/traj_model/oct_seq_len10_dim3_no
 VAE_LOAD_DIR = 'traj_model/oct_seq_len10_dim3_nov1_ckpt'
 VAE_LOAD_DIR = 'traj_model/oct_seq_len10_dim3_withtan_nov1_ckpt'
 VAE_LOAD_DIR="traj_model/nov02_len10_dim3_v1_ckpt"
+expert_data_folder = "/home/zhoutong/hoffung/expert_data_collection/round"
 # VAE_LOAD_DIR='/home/SENSETIME/zhoutong/hoffnung/Trajectory_VAE/result/zNov-v5-len10-dim3-notanh-kllager/ckpt/95_decoder_ckpt'
 # VAE_LOAD_DIR='traj_model/oct30_v2_decoder_ckpt'
 from ding.utils import set_pkg_seed
@@ -40,7 +41,7 @@ metadrive_basic_config = dict(
     env=dict(
         metadrive=dict(use_render=True,
             show_seq_traj = True,
-            traffic_density = 0.30, #0.20
+            traffic_density = 0.35, #0.20
             # need_inverse_traffic=True, #True
 
             seq_traj_len = SEQ_TRAJ_LEN,
@@ -70,6 +71,8 @@ metadrive_basic_config = dict(
             out_of_road_penalty = 5.0,
             debug_info=True,
             ignore_first_steer = False,
+            save_expert_data = True, 
+            expert_data_folder = expert_data_folder,
         ),
         manager=dict(
             shared_memory=False,
@@ -183,7 +186,7 @@ def main(cfg):
     #new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
     evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     #collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
-    for iter in range(15):
+    for iter in range(100):
         stop, reward = evaluator.eval()
         # new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
     evaluator.close()

@@ -17,7 +17,7 @@ from core.utils.simulator_utils.evaluator_utils import MetadriveEvaluator
 #from core.policy.hrl_policy.traj_qac import ConvQAC 
 from core.policy.hrl_policy.const_qac import ConstQAC 
 from core.policy.hrl_policy.traj_sac import TrajSAC
-
+expert_data_folder = "/home/zhoutong/hoffung/expert_data_collection/expcc_straight"
 TRAJ_CONTROL_MODE = 'acc' # 'acc', 'jerk'
 SEQ_TRAJ_LEN = 10
 
@@ -33,13 +33,16 @@ metadrive_basic_config = dict(
             traffic_density = 0.35,
             traj_control_mode = TRAJ_CONTROL_MODE,
             use_speed_reward = True,
+            avg_speed= 4.0,
             #const_episode_max_step = True, 
             #episode_max_step = 100,
             #half_jerk = False,
             #map='XSXS', 
             #use_lateral = True, 
             show_interface=False,
-            debug_info = True,
+            #debug_info = True,
+            save_expert_data = True, 
+            expert_data_folder = expert_data_folder,
             ),
         manager=dict(
             shared_memory=False,
@@ -124,6 +127,7 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/luster/nov01/ckpt/expcc/iteration_10000.pth.tar'
     dir = '/home/SENSETIME/zhoutong/luster/expert policy const sac/iteration_150000.pth.tar'
     dir='/home/SENSETIME/zhoutong/luster/iteration_30000.pth.tar'
+    dir='/home/zhoutong/Downloads/ckpt_best.pth(1).tar'
     #dir = '/home/SENSETIME/zhoutong/drive_project/ckpt/march26/c1_len15_exp3/c5_iteration_40000.pth.tar'
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/exp1_jerk/iteration_70000.pth.tar', map_location = 'cpu'))
     policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))

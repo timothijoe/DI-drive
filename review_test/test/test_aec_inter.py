@@ -32,6 +32,7 @@ VAE_LOAD_DIR="/home/SENSETIME/zhoutong/hoffnung/Trajectory_VAE/result/ztNov2-v3-
 # VAE_LOAD_DIR='/home/SENSETIME/zhoutong/hoffnung/Trajectory_VAE/result/zNov-v5-len10-dim3-notanh-kllager/ckpt/95_decoder_ckpt'
 # VAE_LOAD_DIR='traj_model/oct30_v2_decoder_ckpt'
 VAE_LOAD_DIR="traj_model/nov02_len10_dim3_v1_ckpt"
+expert_data_folder = "/home/zhoutong/hoffung/expert_data_collection/inter"
 metadrive_basic_config = dict(
     exp_name = 'metadrive_basic_sac',
     env=dict(
@@ -67,6 +68,9 @@ metadrive_basic_config = dict(
             out_of_road_penalty = 5.0,
             debug_info=True,
             ignore_first_steer = False,
+            save_expert_data = True, 
+            expert_data_folder = expert_data_folder,
+
         ),
         manager=dict(
             shared_memory=False,
@@ -161,6 +165,7 @@ def main(cfg):
     dir = '/home/SENSETIME/zhoutong/luster/nov8/exp3_inter/iteration_15000.pth.tar'
     dir = '/home/SENSETIME/zhoutong/luster/ral_expert_ckpt/inter/iter_15000_another.pth.tar'
     dir = '/home/zhoutong/hoffung/ztaecrl_ckpt/iteration_75000_inter.pth.tar'
+    dir = '/home/zhoutong/Downloads/iter_15000_another.pth.tar'
     policy._load_state_dict_collect(torch.load(dir, map_location = 'cpu'))
     #policy._load_state_dict_collect(torch.load(dir))
     #policy._load_state_dict_collect(torch.load('/home/SENSETIME/zhoutong/stancy/ckpt_k8s/march12/jerk_full_reward/iteration_40000.pth.tar', map_location = 'cpu'))
@@ -170,7 +175,7 @@ def main(cfg):
     #new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
     evaluator = InteractionSerialEvaluator(cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name)
     #collector = SampleSerialCollector(cfg.policy.collect.collector, collector_env, policy.collect_mode, tb_logger, exp_name=cfg.exp_name)
-    for iter in range(15):
+    for iter in range(100):
         stop, reward = evaluator.eval()
         # new_data = collector.collect(cfg.policy.collect.n_sample, train_iter=learner.train_iter)
     evaluator.close()
